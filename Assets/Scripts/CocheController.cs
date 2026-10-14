@@ -40,8 +40,7 @@ public class CocheController : MonoBehaviour
 
     private void Update()
     {
-        private void Update()
-    {
+        
         // [Tus otros códigos de Espacio y Timers se quedan igual...]
         if (Input.GetKeyDown(KeyCode.Space)) { /* ... */ }
           HandleTimers();
@@ -67,7 +66,7 @@ public class CocheController : MonoBehaviour
         horsesTransform.Rotate(Vector3.up, turnInput * currentTurnSpeed * Time.deltaTime);
 
         currentSpeed = carriageRb.linearVelocity.magnitude;
-    }
+    
     }
 
     private void FixedUpdate()

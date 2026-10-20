@@ -1,24 +1,24 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 [RequireComponent(typeof(Rigidbody))]
 public class CrazyCarriageController : MonoBehaviour
 {
     public enum MovementStage { Detenido, Lento, Medio, GalopeRapido }
 
-    [Header("Referencias del Carruaje")]
-    [Tooltip("Punto trasero de los caballos donde se engancha la carroza")]
+    [Header("Referencias del Carruaje (Se auto-detectan si están vacías)")]
     public Transform hitchPoint;
-    [Tooltip("El objeto visual de la Carroza que seguirá a los caballos")]
     public Transform carrozaTransform;
-    [Tooltip("Distancia entre el Hitchpoint y el centro de la carroza")]
-    public float hitchDistance = 3.0f;
-    [Tooltip("Qué tan rápido se alinea la carroza al doblar (menor = más derrape visual)")]
-    public float carriageFollowSpeed = 8.0f;
+    [Tooltip("Distancia entre los caballos y la carroza")]
+    public float hitchDistance = 2.8f;
+    [Tooltip("Velocidad con la que la carroza se alinea al giro de los caballos (estilo GTA GBA)")]
+    public float carriageFollowSpeed = 6.0f;
 
     [Header("Progresión y Aceleración (Espacio)")]
-    public float inputWindowTime = 1.2f;
+    public float inputWindowTime = 1.5f;
     public float maxSprintDuration = 3.0f;
-    [Tooltip("Cantidad máxima de veces que puedes activar el Galope Rápido")]
     public int maxSprintUses = 3;
     public int remainingSprintUses;
 
@@ -26,106 +26,154 @@ public class CrazyCarriageController : MonoBehaviour
     public float slowSpeed = 6f;
     public float mediumSpeed = 13f;
     public float fastSpeed = 22f;
-    public float accelerationRate = 12f;
-    public float decelerationRate = 6f;
+    public float accelerationRate = 15f;
+    public float decelerationRate = 8f;
 
-    [Header("Giro estilo Arcade")]
-    public float turnSpeed = 90f;
-    [Range(0.1f, 1f)] public float highSpeedTurnFactor = 0.5f;
+    [Header("Giro estilo GTA GBA")]
+    public float turnSpeed = 120f;
+    [Range(0.2f, 1f)] public float highSpeedTurnFactor = 0.65f;
 
     [Header("Estado Actual (Solo Lectura)")]
     public MovementStage currentStage = MovementStage.Detenido;
     public float currentSpeed;
+    public int spacePressCount;
 
     private Rigidbody rb;
     private float targetMaxSpeed;
     private float lastInputTime;
     private float sprintTimer;
-    private int spacePressCount;
     private float turnInput;
 
-    // Guardamos la rotación y posición previa de la carroza para que articule como remolque real
-    private Vector3 currentCarriagePos;
+    private Vector3 localForwardAxis = Vector3.forward;
     private Quaternion currentCarriageRot;
+    private Quaternion carriageRotationOffset = Quaternion.identity;
+    private float initialY;
+    private float initialCarriageY;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        rb.useGravity = false; // En estilo GTA GBA evitamos que caiga o se hunda en el plano
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
-        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezeRotationY;
+        rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionY;
 
         remainingSprintUses = maxSprintUses;
+        AutoFindReferences();
     }
 
-    [Header("Ajustes de Alineación (Por si el modelo viene rotado)")]
-    [Tooltip("Si la carroza mira de lado al dar Play, pon 90, -90 o 180 aquí")]
-    public float carriageYawOffset = 0f;
-    [Tooltip("Ajuste lateral fino (dejar en 0 para estar justo detrás)")]
-    public float lateralOffset = 0f;
+    // Busca automáticamente "Carroza" y "Hitchpoint" en la escena si no los arrastraste en el Inspector
+    private void AutoFindReferences()
+    {
+        if (hitchPoint == null)
+        {
+            Transform foundHitch = transform.Find("Hitchpoint");
+            hitchPoint = (foundHitch != null) ? foundHitch : transform;
+        }
+
+        if (carrozaTransform == null)
+        {
+            GameObject foundCarroza = GameObject.Find("Carroza");
+            if (foundCarroza != null) carrozaTransform = foundCarroza.transform;
+        }
+    }
 
     void Start()
     {
+        AutoFindReferences();
         SetStage(MovementStage.Detenido);
 
-        if (hitchPoint != null && carrozaTransform != null)
+        initialY = transform.position.y;
+
+        if (carrozaTransform != null)
         {
-            // 1. Forzamos a que el Hitchpoint esté centrado localmente en X si se movió por error
-            // (Opcional: quita esta línea si quieres usar lateralOffset manual desde el Hitchpoint)
-            Vector3 localHitch = hitchPoint.localPosition;
-            localHitch.x = lateralOffset;
-            hitchPoint.localPosition = localHitch;
+            initialCarriageY = carrozaTransform.position.y;
 
-            // 2. Desemparentar la carroza para que articule libremente
+            // Detecta en qué dirección pusiste la carroza en la escena para saber cuál es "Atrás" y "Adelante"
+            Vector3 toCarriage = carrozaTransform.position - transform.position;
+            toCarriage.y = 0f;
+
+            if (toCarriage.magnitude > 0.1f)
+            {
+                hitchDistance = toCarriage.magnitude;
+                Vector3 worldForward = -toCarriage.normalized;
+                localForwardAxis = transform.InverseTransformDirection(worldForward);
+            }
+
+            Vector3 forwardWorld = GetWorldForward();
+            Quaternion lookRot = Quaternion.LookRotation(forwardWorld, Vector3.up);
+            carriageRotationOffset = Quaternion.Inverse(lookRot) * carrozaTransform.rotation;
+
+            // Asegurarnos de que el Hitchpoint esté un poco hacia la cola de los caballos para que al girar haga palanca
+            if (hitchPoint != transform && hitchPoint.localPosition.sqrMagnitude < 0.05f)
+            {
+                hitchPoint.localPosition = -localForwardAxis * 0.6f;
+            }
+
             carrozaTransform.SetParent(null);
-
-            // 3. Colocarla exactamente detrás usando la dirección de los caballos
-            currentCarriageRot = transform.rotation;
-            currentCarriagePos = hitchPoint.position - (transform.forward * hitchDistance);
-            currentCarriagePos.y = hitchPoint.position.y;
-
-            carrozaTransform.position = currentCarriagePos;
-            carrozaTransform.rotation = currentCarriageRot * Quaternion.Euler(0f, carriageYawOffset, 0f);
+            currentCarriageRot = lookRot;
+            UpdateCarriageTrailer(true);
         }
+    }
+
+    private Vector3 GetWorldForward()
+    {
+        Vector3 dir = transform.TransformDirection(localForwardAxis);
+        dir.y = 0f;
+        return dir.sqrMagnitude > 0.001f ? dir.normalized : transform.forward;
     }
 
     void Update()
     {
-        // 1. Lectura de giro
-        turnInput = Input.GetAxis("Horizontal");
+        bool spacePressed = false;
+        turnInput = 0f;
 
-        // 2. Lectura de barra espaciadora para acelerar
-        if (Input.GetKeyDown(KeyCode.Space))
+        // Lee Input clásico
+        try
+        {
+            if (Input.GetKeyDown(KeyCode.Space)) spacePressed = true;
+            turnInput = Input.GetAxisRaw("Horizontal");
+        }
+        catch { }
+
+        // Y también lee el New Input System por si está activo en Unity 6
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            if (Keyboard.current.spaceKey.wasPressedThisFrame) spacePressed = true;
+            float newTurn = 0f;
+            if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) newTurn -= 1f;
+            if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) newTurn += 1f;
+            if (Mathf.Abs(newTurn) > 0.01f) turnInput = newTurn;
+        }
+#endif
+
+        if (spacePressed)
         {
             spacePressCount++;
             lastInputTime = Time.time;
             EvaluateStageProgression();
         }
 
-        // 3. Control de tiempos y decaimiento de velocidad
         HandleTimers();
     }
 
     void FixedUpdate()
     {
         HandleMovementAndSteering();
-        UpdateCarriageTrailer();
+        UpdateCarriageTrailer(false);
     }
 
     private void HandleMovementAndSteering()
     {
-        // Calcular velocidad actual en plano horizontal
-        Vector3 flatVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-        currentSpeed = flatVel.magnitude;
+        // Avanzar o frenar hacia la velocidad objetivo
+        currentSpeed = Mathf.MoveTowards(currentSpeed, targetMaxSpeed, 
+            ((currentSpeed < targetMaxSpeed) ? accelerationRate : decelerationRate) * Time.fixedDeltaTime);
 
-        // Acelerar o desacelerar suavemente hacia la velocidad de la etapa actual
-        float rate = (currentSpeed < targetMaxSpeed) ? accelerationRate : decelerationRate;
-        float newSpeed = Mathf.MoveTowards(currentSpeed, targetMaxSpeed, rate * Time.fixedDeltaTime);
-
-        // Giro más ágil (solo gira si nos estamos moviendo un poco, o si quieres girar en el lugar quita el if)
-        if (newSpeed > 0.1f && Mathf.Abs(turnInput) > 0.01f)
+        // Girar los caballos con A/D o Flechas
+        if (Mathf.Abs(turnInput) > 0.01f)
         {
-            float speedPercent = Mathf.Clamp01(newSpeed / fastSpeed);
+            float speedPercent = Mathf.Clamp01(currentSpeed / fastSpeed);
             float turnMod = Mathf.Lerp(1f, highSpeedTurnFactor, speedPercent);
             float turnAngle = turnInput * turnSpeed * turnMod * Time.fixedDeltaTime;
 
@@ -133,38 +181,54 @@ public class CrazyCarriageController : MonoBehaviour
             rb.MoveRotation(rb.rotation * turnRotation);
         }
 
-        // Aplicar velocidad directamente en la dirección a la que miran los caballos (conducción tipo Crazy Taxi)
-        Vector3 targetVelocity = transform.forward * newSpeed;
-        targetVelocity.y = rb.linearVelocity.y; // Respetar la gravedad
-        rb.linearVelocity = targetVelocity;
+        // Mover en la dirección a la que miran los caballos
+        Vector3 forwardDir = GetWorldForward();
+        rb.linearVelocity = new Vector3(forwardDir.x * currentSpeed, 0f, forwardDir.z * currentSpeed);
     }
 
-   private void UpdateCarriageTrailer()
+    private void UpdateCarriageTrailer(bool instant)
     {
-        if (hitchPoint == null || carrozaTransform == null) return;
+        if (carrozaTransform == null) return;
 
-        // Dirección desde la carroza hacia el punto de enganche
-        Vector3 dirToHitch = hitchPoint.position - currentCarriagePos;
-        dirToHitch.y = 0f;
+        Vector3 horseForward = GetWorldForward();
+        Quaternion horseLookRot = Quaternion.LookRotation(horseForward, Vector3.up);
 
-        if (dirToHitch.sqrMagnitude > 0.001f)
+        // Punto de enganche detrás de los caballos
+        Vector3 anchorPos = (hitchPoint != null && hitchPoint != transform) 
+            ? hitchPoint.position 
+            : transform.position - (horseForward * 0.5f);
+
+        if (instant)
         {
-            Quaternion targetRot = Quaternion.LookRotation(dirToHitch.normalized, Vector3.up);
+            currentCarriageRot = horseLookRot;
+        }
+        else
+        {
+            // Combinamos el tirón por desplazamiento (cuando avanza) + alineación angular (cuando gira en el lugar)
+            Vector3 dirToHitch = anchorPos - carrozaTransform.position;
+            dirToHitch.y = 0f;
+
+            Quaternion pullRot = (dirToHitch.sqrMagnitude > 0.001f) 
+                ? Quaternion.LookRotation(dirToHitch.normalized, Vector3.up) 
+                : horseLookRot;
+
+            // Si va rápido, domina el efecto remolque físico; si gira lento o quieto, sigue el giro de los caballos
+            float moveBlend = Mathf.Clamp01(currentSpeed / slowSpeed);
+            Quaternion targetRot = Quaternion.Slerp(horseLookRot, pullRot, moveBlend * 0.7f);
+
             currentCarriageRot = Quaternion.Slerp(currentCarriageRot, targetRot, carriageFollowSpeed * Time.fixedDeltaTime);
         }
 
-        // Mantener la carroza exactamente a 'hitchDistance' detrás del enganche
-        currentCarriagePos = hitchPoint.position - (currentCarriageRot * Vector3.forward * hitchDistance);
-        currentCarriagePos.y = hitchPoint.position.y;
+        // Posicionar la carroza siempre enganchada detrás de los caballos según su ángulo actual
+        float restDistance = (hitchPoint != null && hitchPoint != transform) ? (hitchDistance - 0.5f) : hitchDistance;
+        Vector3 newCarriagePos = anchorPos - (currentCarriageRot * Vector3.forward * restDistance);
+        newCarriagePos.y = initialCarriageY;
 
-        // Aplicar posición y rotación (incluyendo la corrección si el modelo 3D viene girado)
-        Quaternion finalVisualRot = currentCarriageRot * Quaternion.Euler(0f, carriageYawOffset, 0f);
-        carrozaTransform.SetPositionAndRotation(currentCarriagePos, finalVisualRot);
+        carrozaTransform.SetPositionAndRotation(newCarriagePos, currentCarriageRot * carriageRotationOffset);
     }
 
     private void EvaluateStageProgression()
     {
-        // Pasar a Galope Rápido (solo si quedan usos disponibles)
         if (spacePressCount >= 12 && currentStage != MovementStage.GalopeRapido)
         {
             if (remainingSprintUses > 0)
@@ -174,10 +238,8 @@ public class CrazyCarriageController : MonoBehaviour
             }
             else
             {
-                // Si no quedan usos de máxima velocidad, nos quedamos en Medio como tope
                 spacePressCount = 10;
-                if (currentStage != MovementStage.Medio)
-                    SetStage(MovementStage.Medio);
+                if (currentStage != MovementStage.Medio) SetStage(MovementStage.Medio);
             }
         }
         else if (spacePressCount >= 5 && currentStage == MovementStage.Lento)
@@ -192,28 +254,23 @@ public class CrazyCarriageController : MonoBehaviour
 
     private void HandleTimers()
     {
-        // Si deja de presionar espacio, baja de etapa progresivamente
         if (Time.time - lastInputTime > inputWindowTime && currentStage != MovementStage.Detenido)
         {
             spacePressCount = Mathf.Max(0, spacePressCount - 3);
 
-            if (currentStage == MovementStage.GalopeRapido)
-                SetStage(MovementStage.Medio);
-            else if (currentStage == MovementStage.Medio && spacePressCount < 5)
-                SetStage(MovementStage.Lento);
-            else if (currentStage == MovementStage.Lento && spacePressCount == 0)
-                SetStage(MovementStage.Detenido);
+            if (currentStage == MovementStage.GalopeRapido) SetStage(MovementStage.Medio);
+            else if (currentStage == MovementStage.Medio && spacePressCount < 5) SetStage(MovementStage.Lento);
+            else if (currentStage == MovementStage.Lento && spacePressCount == 0) SetStage(MovementStage.Detenido);
 
             lastInputTime = Time.time;
         }
 
-        // Duración máxima del Sprint (Galope Rápido)
         if (currentStage == MovementStage.GalopeRapido)
         {
             sprintTimer += Time.deltaTime;
             if (sprintTimer >= maxSprintDuration)
             {
-                spacePressCount = 6; // Bajar al rango de velocidad media
+                spacePressCount = 6;
                 SetStage(MovementStage.Medio);
             }
         }
@@ -226,45 +283,22 @@ public class CrazyCarriageController : MonoBehaviour
 
         switch (currentStage)
         {
-            case MovementStage.Detenido:
-                targetMaxSpeed = 0f;
-                break;
-            case MovementStage.Lento:
-                targetMaxSpeed = slowSpeed;
-                break;
-            case MovementStage.Medio:
-                targetMaxSpeed = mediumSpeed;
-                break;
-            case MovementStage.GalopeRapido:
-                targetMaxSpeed = fastSpeed;
-                break;
+            case MovementStage.Detenido: targetMaxSpeed = 0f; break;
+            case MovementStage.Lento: targetMaxSpeed = slowSpeed; break;
+            case MovementStage.Medio: targetMaxSpeed = mediumSpeed; break;
+            case MovementStage.GalopeRapido: targetMaxSpeed = fastSpeed; break;
         }
     }
 
-
-
-
-
-
-
-
-
-
-// Esto dibuja una línea amarilla y una esfera en la ventana Scene para que veas dónde quedará la carroza
     private void OnDrawGizmos()
     {
-        if (hitchPoint != null)
+        AutoFindReferences();
+        if (carrozaTransform != null)
         {
-            Gizmos.color = Color.yellow;
-            Vector3 previewPos = hitchPoint.position - (transform.forward * hitchDistance);
-            Gizmos.DrawLine(hitchPoint.position, previewPos);
-            Gizmos.DrawWireSphere(previewPos, 0.4f);
+            Gizmos.color = Color.green;
+            Vector3 start = (hitchPoint != null) ? hitchPoint.position : transform.position;
+            Gizmos.DrawLine(start, carrozaTransform.position);
+            Gizmos.DrawWireSphere(carrozaTransform.position, 0.35f);
         }
     }
-
-
-
-
-
-
 }

@@ -8,12 +8,10 @@ public class CrazyCarriageController : MonoBehaviour
 {
     public enum MovementStage { Detenido, Lento, Medio, GalopeRapido }
 
-    [Header("Referencias del Carruaje (Se auto-detectan si están vacías)")]
+    [Header("Referencias del Carruaje (Auto-detectadas)")]
     public Transform hitchPoint;
     public Transform carrozaTransform;
-    [Tooltip("Distancia entre los caballos y la carroza")]
     public float hitchDistance = 2.8f;
-    [Tooltip("Velocidad con la que la carroza se alinea al giro de los caballos (estilo GTA GBA)")]
     public float carriageFollowSpeed = 6.0f;
 
     [Header("Progresión y Aceleración (Espacio)")]
@@ -29,13 +27,27 @@ public class CrazyCarriageController : MonoBehaviour
     public float accelerationRate = 15f;
     public float decelerationRate = 8f;
 
-    [Header("Giro estilo GTA GBA")]
-    public float turnSpeed = 120f;
-    [Range(0.2f, 1f)] public float highSpeedTurnFactor = 0.65f;
+    [Header("Giro Normal (Sin Shift)")]
+    public float turnSpeed = 110f;
+    [Tooltip("Al ir rápido SIN Shift, cuesta más doblar (te abres en las curvas)")]
+    [Range(0.1f, 1f)] public float highSpeedTurnFactor = 0.35f;
+
+    [Header("Derrape (Mantener Shift + Dirección)")]
+    [Tooltip("Velocidad mínima para poder derrapar (ej. etapa Medio o Galope Rápido)")]
+    public float minSpeedToDrift = 9f;
+    [Tooltip("Multiplicador de giro al derrapar con Shift")]
+    public float driftTurnMultiplier = 1.85f;
+    [Tooltip("Qué tanto patinan los caballos de costado (menor = más resbaladizo)")]
+    public float driftTraction = 3.5f;
+    [Tooltip("Ángulo extra que se abre la cola de la carroza al derrapar")]
+    public float carriageDriftSwingAngle = 38f;
+    [Tooltip("Qué tan lento recupera la línea la carroza durante el derrape")]
+    public float carriageDriftFollowSpeed = 2.5f;
 
     [Header("Estado Actual (Solo Lectura)")]
     public MovementStage currentStage = MovementStage.Detenido;
     public float currentSpeed;
+    public bool isDrifting;
     public int spacePressCount;
 
     private Rigidbody rb;
@@ -43,17 +55,18 @@ public class CrazyCarriageController : MonoBehaviour
     private float lastInputTime;
     private float sprintTimer;
     private float turnInput;
+    private bool shiftHeld;
 
     private Vector3 localForwardAxis = Vector3.forward;
+    private Vector3 currentMoveDirection;
     private Quaternion currentCarriageRot;
     private Quaternion carriageRotationOffset = Quaternion.identity;
-    private float initialY;
     private float initialCarriageY;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        rb.useGravity = false; // En estilo GTA GBA evitamos que caiga o se hunda en el plano
+        rb.useGravity = false;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
         rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionY;
@@ -62,7 +75,6 @@ public class CrazyCarriageController : MonoBehaviour
         AutoFindReferences();
     }
 
-    // Busca automáticamente "Carroza" y "Hitchpoint" en la escena si no los arrastraste en el Inspector
     private void AutoFindReferences()
     {
         if (hitchPoint == null)
@@ -83,13 +95,10 @@ public class CrazyCarriageController : MonoBehaviour
         AutoFindReferences();
         SetStage(MovementStage.Detenido);
 
-        initialY = transform.position.y;
-
         if (carrozaTransform != null)
         {
             initialCarriageY = carrozaTransform.position.y;
 
-            // Detecta en qué dirección pusiste la carroza en la escena para saber cuál es "Atrás" y "Adelante"
             Vector3 toCarriage = carrozaTransform.position - transform.position;
             toCarriage.y = 0f;
 
@@ -101,10 +110,11 @@ public class CrazyCarriageController : MonoBehaviour
             }
 
             Vector3 forwardWorld = GetWorldForward();
+            currentMoveDirection = forwardWorld;
+
             Quaternion lookRot = Quaternion.LookRotation(forwardWorld, Vector3.up);
             carriageRotationOffset = Quaternion.Inverse(lookRot) * carrozaTransform.rotation;
 
-            // Asegurarnos de que el Hitchpoint esté un poco hacia la cola de los caballos para que al girar haga palanca
             if (hitchPoint != transform && hitchPoint.localPosition.sqrMagnitude < 0.05f)
             {
                 hitchPoint.localPosition = -localForwardAxis * 0.6f;
@@ -113,6 +123,10 @@ public class CrazyCarriageController : MonoBehaviour
             carrozaTransform.SetParent(null);
             currentCarriageRot = lookRot;
             UpdateCarriageTrailer(true);
+        }
+        else
+        {
+            currentMoveDirection = GetWorldForward();
         }
     }
 
@@ -127,20 +141,24 @@ public class CrazyCarriageController : MonoBehaviour
     {
         bool spacePressed = false;
         turnInput = 0f;
+        shiftHeld = false;
 
-        // Lee Input clásico
+        // Input Clásico
         try
         {
             if (Input.GetKeyDown(KeyCode.Space)) spacePressed = true;
+            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) shiftHeld = true;
             turnInput = Input.GetAxisRaw("Horizontal");
         }
         catch { }
 
-        // Y también lee el New Input System por si está activo en Unity 6
+        // New Input System (Unity 6)
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
         {
             if (Keyboard.current.spaceKey.wasPressedThisFrame) spacePressed = true;
+            if (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed) shiftHeld = true;
+
             float newTurn = 0f;
             if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) newTurn -= 1f;
             if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) newTurn += 1f;
@@ -160,30 +178,56 @@ public class CrazyCarriageController : MonoBehaviour
 
     void FixedUpdate()
     {
-        HandleMovementAndSteering();
+        HandleMovementAndDrift();
         UpdateCarriageTrailer(false);
     }
 
-    private void HandleMovementAndSteering()
+    private void HandleMovementAndDrift()
     {
-        // Avanzar o frenar hacia la velocidad objetivo
-        currentSpeed = Mathf.MoveTowards(currentSpeed, targetMaxSpeed, 
-            ((currentSpeed < targetMaxSpeed) ? accelerationRate : decelerationRate) * Time.fixedDeltaTime);
+        // 1. Calcular velocidad actual
+        float accel = (currentSpeed < targetMaxSpeed) ? accelerationRate : decelerationRate;
+        currentSpeed = Mathf.MoveTowards(currentSpeed, targetMaxSpeed, accel * Time.fixedDeltaTime);
 
-        // Girar los caballos con A/D o Flechas
+        // 2. ¿Está derrapando? (Requiere presionar Shift, estar doblando e ir suficientemente rápido)
+        isDrifting = shiftHeld && Mathf.Abs(turnInput) > 0.01f && currentSpeed >= minSpeedToDrift;
+
+        // 3. Rotación de los caballos
         if (Mathf.Abs(turnInput) > 0.01f)
         {
-            float speedPercent = Mathf.Clamp01(currentSpeed / fastSpeed);
-            float turnMod = Mathf.Lerp(1f, highSpeedTurnFactor, speedPercent);
-            float turnAngle = turnInput * turnSpeed * turnMod * Time.fixedDeltaTime;
+            float turnAngle;
+
+            if (isDrifting)
+            {
+                // Con Shift: Giro agresivo y cerrado sin perder capacidad de doblar por ir rápido
+                turnAngle = turnInput * turnSpeed * driftTurnMultiplier * Time.fixedDeltaTime;
+            }
+            else
+            {
+                // Sin Shift: A alta velocidad cuesta más doblar (te obliga a usar Shift en curvas cerradas)
+                float speedPercent = Mathf.Clamp01(currentSpeed / fastSpeed);
+                float turnMod = Mathf.Lerp(1f, highSpeedTurnFactor, speedPercent);
+                turnAngle = turnInput * turnSpeed * turnMod * Time.fixedDeltaTime;
+            }
 
             Quaternion turnRotation = Quaternion.Euler(0f, turnAngle, 0f);
             rb.MoveRotation(rb.rotation * turnRotation);
         }
 
-        // Mover en la dirección a la que miran los caballos
-        Vector3 forwardDir = GetWorldForward();
-        rb.linearVelocity = new Vector3(forwardDir.x * currentSpeed, 0f, forwardDir.z * currentSpeed);
+        // 4. Dirección de deslizamiento (Inercia estilo GTA GBA)
+        Vector3 desiredForward = GetWorldForward();
+
+        if (isDrifting)
+        {
+            // Mientras derrapa, la dirección de movimiento tarda en alcanzar hacia dónde miran los caballos (patina de costado)
+            currentMoveDirection = Vector3.Slerp(currentMoveDirection, desiredForward, driftTraction * Time.fixedDeltaTime).normalized;
+        }
+        else
+        {
+            // Al soltar Shift, recupera el agarre rápidamente
+            currentMoveDirection = Vector3.Slerp(currentMoveDirection, desiredForward, 12f * Time.fixedDeltaTime).normalized;
+        }
+
+        rb.linearVelocity = new Vector3(currentMoveDirection.x * currentSpeed, 0f, currentMoveDirection.z * currentSpeed);
     }
 
     private void UpdateCarriageTrailer(bool instant)
@@ -193,9 +237,8 @@ public class CrazyCarriageController : MonoBehaviour
         Vector3 horseForward = GetWorldForward();
         Quaternion horseLookRot = Quaternion.LookRotation(horseForward, Vector3.up);
 
-        // Punto de enganche detrás de los caballos
-        Vector3 anchorPos = (hitchPoint != null && hitchPoint != transform) 
-            ? hitchPoint.position 
+        Vector3 anchorPos = (hitchPoint != null && hitchPoint != transform)
+            ? hitchPoint.position
             : transform.position - (horseForward * 0.5f);
 
         if (instant)
@@ -204,22 +247,27 @@ public class CrazyCarriageController : MonoBehaviour
         }
         else
         {
-            // Combinamos el tirón por desplazamiento (cuando avanza) + alineación angular (cuando gira en el lugar)
             Vector3 dirToHitch = anchorPos - carrozaTransform.position;
             dirToHitch.y = 0f;
 
-            Quaternion pullRot = (dirToHitch.sqrMagnitude > 0.001f) 
-                ? Quaternion.LookRotation(dirToHitch.normalized, Vector3.up) 
+            Quaternion pullRot = (dirToHitch.sqrMagnitude > 0.001f)
+                ? Quaternion.LookRotation(dirToHitch.normalized, Vector3.up)
                 : horseLookRot;
 
-            // Si va rápido, domina el efecto remolque físico; si gira lento o quieto, sigue el giro de los caballos
             float moveBlend = Mathf.Clamp01(currentSpeed / slowSpeed);
             Quaternion targetRot = Quaternion.Slerp(horseLookRot, pullRot, moveBlend * 0.7f);
 
-            currentCarriageRot = Quaternion.Slerp(currentCarriageRot, targetRot, carriageFollowSpeed * Time.fixedDeltaTime);
+            // EFECTO LATIGAZO EN DERRAPE: Si está derrapando, la carroza se abre hacia afuera de la curva
+            if (isDrifting)
+            {
+                Quaternion driftSwing = Quaternion.Euler(0f, -turnInput * carriageDriftSwingAngle, 0f);
+                targetRot = horseLookRot * driftSwing;
+            }
+
+            float followSpd = isDrifting ? carriageDriftFollowSpeed : carriageFollowSpeed;
+            currentCarriageRot = Quaternion.Slerp(currentCarriageRot, targetRot, followSpd * Time.fixedDeltaTime);
         }
 
-        // Posicionar la carroza siempre enganchada detrás de los caballos según su ángulo actual
         float restDistance = (hitchPoint != null && hitchPoint != transform) ? (hitchDistance - 0.5f) : hitchDistance;
         Vector3 newCarriagePos = anchorPos - (currentCarriageRot * Vector3.forward * restDistance);
         newCarriagePos.y = initialCarriageY;
@@ -295,7 +343,7 @@ public class CrazyCarriageController : MonoBehaviour
         AutoFindReferences();
         if (carrozaTransform != null)
         {
-            Gizmos.color = Color.green;
+            Gizmos.color = isDrifting ? Color.red : Color.green;
             Vector3 start = (hitchPoint != null) ? hitchPoint.position : transform.position;
             Gizmos.DrawLine(start, carrozaTransform.position);
             Gizmos.DrawWireSphere(carrozaTransform.position, 0.35f);

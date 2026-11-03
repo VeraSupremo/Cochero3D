@@ -44,7 +44,7 @@ public class CrazyCarriageController : MonoBehaviour
     [Tooltip("Qué tan lento recupera la línea la carroza durante el derrape")]
     public float carriageDriftFollowSpeed = 2.5f;
 
-    [Header("Estado Actual (Solo Lectura)")]
+    [Header("Estado Actual (Lectura)")]
     public MovementStage currentStage = MovementStage.Detenido;
     public float currentSpeed;
     public bool isDrifting;
@@ -152,7 +152,6 @@ public class CrazyCarriageController : MonoBehaviour
         }
         catch { }
 
-        // New Input System (Unity 6)
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
         {

@@ -49,7 +49,12 @@ public class GlobalTimeManager : MonoBehaviour
         {
             currentHour = 6f;
             isTimePaused = true;
-            // Llamar al GameManager para cambiar de noche
+
+            //Aquí es donde realmente el juego ejecuta el cambio de noche y fase lunar
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.AdvanceMoonPhase();
+            }
         }
     }
 }

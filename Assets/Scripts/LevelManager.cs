@@ -19,7 +19,43 @@ public class LevelManager : MonoBehaviour
             // Juego Normal: El tiempo fluye
             GlobalTimeManager.Instance.isTimePaused = false;
             GlobalTimeManager.Instance.realSecondsPerHour = 60f; // 1 hora de juego = 1 minuto real
-            GlobalTimeManager.Instance.currentHour = 21f;        // Forzamos el inicio de la noche a las 21:00
+            GlobalTimeManager.Instance.currentHour = 21f;        // Forzar el inicio de la noche a las 21:00
+
+            //Leer fase lunar desde el GameManager
+            if (GameManager.Instance != null)
+            {
+                // Guarda 'MoonPhase'
+                MoonPhase currentPhase = GameManager.Instance.currentMoonPhase;
+                ApplyMoonPhaseEffects(currentPhase);
+            }
+
+        }
+    }
+
+    //función para procesar los efectos de la luna
+    private void ApplyMoonPhaseEffects(MoonPhase phase)
+    {
+        switch (phase)
+        {
+            case MoonPhase.New:
+                // Luna nueva, sin Luz
+                //aplicar efectos
+                break;
+
+            case MoonPhase.Waxing:
+                // Luna Creciente, luz aumenta
+                //aplicar efectos
+                break;
+
+            case MoonPhase.Full:
+                // Luna Llena + Brillo
+                //aplicar efectos
+                break;
+
+            case MoonPhase.Third:
+                // Cuarto Menguante, luz decayente
+                //aplicar efectos
+                break;
         }
     }
 }

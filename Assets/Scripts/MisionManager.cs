@@ -35,8 +35,12 @@ public class MissionManager : MonoBehaviour
         [Tooltip("Numero identificador de la mision (ej. 1, 2, 3, 4, 5...)")]
         public int numeroDeMision = 1;
 
+        [Header("Pasajero de esta Mision (Opcional)")]
+        [Tooltip("Si lo dejas vacio, usara el Prefab de Pasajero por Defecto del MissionManager")]
+        public GameObject prefabPasajeroEspecifico;
+
         [Header("Puntos Vacios del Mapa (Transforms)")]
-        [Tooltip("GameObject vacio donde aparece el marcador para ir a aceptar la mision")]
+        [Tooltip("GameObject vacio donde aparece el marcador y el pasajero para ir a aceptar la mision")]
         public Transform puntoDeInicio;
 
         [Tooltip("GameObject vacio que actua como Punto de Llegada / Triunfo (Gran punto amarillo)")]
@@ -72,6 +76,16 @@ public class MissionManager : MonoBehaviour
     [Tooltip("Objeto Caballos (si se deja vacio, busca CrazyCarriageController automaticamente)")]
     public Transform jugadorTransform;
     private CrazyCarriageController carriageController;
+
+    [Header("Configuracion de Pasajeros (Prefabs)")]
+    [Tooltip("Arrastra aqui el Prefab de tu pasajero que aparecera dentro del circulo azul")]
+    public GameObject prefabPasajeroPorDefecto;
+    [Tooltip("Ajuste de altura por si el pivote de tu Prefab queda enterrado en el suelo")]
+    public Vector3 offsetPosicionPasajero = new Vector3(0f, 0f, 0f);
+    [Tooltip("Si esta activo, el pasajero mira hacia el jugador mientras espera en el punto azul")]
+    public bool pasajeroMiraAlJugador = true;
+    [Tooltip("Si esta activo, cuando completas la mision el pasajero se baja en el destino y desaparece a los pocos segundos")]
+    public bool instanciarPasajeroAlBajarse = true;
 
     [Header("Configuracion de Nivel y Tiempos (Estilo Uber)")]
     [Tooltip("Nivel en el que inicia el juego (por defecto Nivel 1)")]
@@ -110,6 +124,7 @@ public class MissionManager : MonoBehaviour
 
     private float temporizadorRandom = 0f;
     private List<GameObject> marcadoresVisualesOfertas = new List<GameObject>();
+    private List<GameObject> pasajerosInstanciadosOfertas = new List<GameObject>();
     private GameObject marcadorVisualDestinoCentro;
     private GameObject marcadorVisualDestinoArea;
     private bool jugadorEstuvoDentroDelArea = false;
@@ -155,7 +170,7 @@ public class MissionManager : MonoBehaviour
     {
         if (jugadorTransform == null) return;
 
-        // Si se presiona ENTER, se relanza el random para ofrecer otra mision del nivel actual
+        // Si se presiona ENTER, destruye los pasajeros actuales y relanza el random
         if (SePresionoEnter())
         {
             Debug.Log("[MissionManager] ENTER presionado: Relanzando random de misiones para el Nivel " + nivelActual);
@@ -174,6 +189,7 @@ public class MissionManager : MonoBehaviour
                 break;
 
             case MissionState.OfertasDisponiblesEnMapa:
+                ActualizarMiradaDePasajeros();
                 VerificarAceptacionDeMisionEnPuntoDeInicio();
                 break;
 
@@ -184,12 +200,12 @@ public class MissionManager : MonoBehaviour
     }
 
     // =========================================================================
-    // SISTEMA UBER: SORTEO RANDOM POR NIVEL Y ACEPTACION
+    // SISTEMA UBER: SORTEO RANDOM POR NIVEL E INSTANCIACION DE PASAJEROS
     // =========================================================================
 
     public void LanzarRandomMisionPorNivel(int nivel)
     {
-        OcultarTodosLosMarcadores();
+        OcultarTodosLosMarcadores(); // Tambien destruye pasajeros de ofertas anteriores
         ofertasDisponiblesActuales.Clear();
         misionAceptadaActual = null;
         jugadorEstuvoDentroDelArea = false;
@@ -221,9 +237,13 @@ public class MissionManager : MonoBehaviour
 
             ofertasDisponiblesActuales.Add(misionElegida);
 
+            // 1. Activar el cilindro azul en el suelo
             ActivarMarcadorOferta(i, misionElegida.puntoDeInicio.position, misionElegida.radioDeAceptacion, colorIndicadorInicio);
 
-            Debug.Log($"[MissionManager] Oferta estilo Uber generada en Nivel {misionElegida.nivelDeMision} | Mision #{misionElegida.numeroDeMision} ({misionElegida.nombreReferencia}). Dirigirse al indicador AZUL para aceptarla.");
+            // 2. Instanciar el Prefab del pasajero en ese mismo punto de inicio
+            InstanciarPasajeroEnInicio(misionElegida);
+
+            Debug.Log($"[MissionManager] Oferta generada en Nivel {misionElegida.nivelDeMision} | Mision #{misionElegida.numeroDeMision} ({misionElegida.nombreReferencia}). Pasajero esperando en punto AZUL.");
         }
 
         if (ofertasDisponiblesActuales.Count > 0)
@@ -255,9 +275,10 @@ public class MissionManager : MonoBehaviour
         misionAceptadaActual = misionConfirmada;
         jugadorEstuvoDentroDelArea = false;
 
+        // Oculta los cilindros azules y destruye los pasajeros de la calle (simulando que subio a la carroza)
         OcultarTodosLosMarcadores();
 
-        // Al aceptar la mision, el indicador azul pasa a ser amarillo en el Punto de Llegada
+        // El indicador azul pasa a ser amarillo en el Punto de Llegada
         if (misionAceptadaActual.puntoDeLlegada != null)
         {
             ActivarMarcadorDestinoAmarillo(
@@ -269,13 +290,78 @@ public class MissionManager : MonoBehaviour
 
         estadoActual = MissionState.MisionEnCursoHaciaDestino;
 
-        Debug.Log($"[MissionManager] Mision ACEPTADA ({categoriaActiva}): Nivel {misionAceptadaActual.nivelDeMision} - Mision #{misionAceptadaActual.numeroDeMision} ({misionAceptadaActual.nombreReferencia}). El indicador ha cambiado a AMARILLO en el Punto de Llegada.");
+        Debug.Log($"[MissionManager] Pasajero recogido y Mision ACEPTADA ({categoriaActiva}): Nivel {misionAceptadaActual.nivelDeMision} - Mision #{misionAceptadaActual.numeroDeMision}. Dirigirse al punto AMARILLO.");
+    }
 
-        // ---------------------------------------------------------------------
-        // COMENTARIO PARA FUTURA IMPLEMENTACION DE TEXTOS:
-        // Aqui se puede notificar al futuro script de UI/Dialogos para mostrar
-        // el texto de la mision aceptada (tanto aleatoria como principal).
-        // ---------------------------------------------------------------------
+    // =========================================================================
+    // LOGICA DE INSTANCIACION Y LIMPIEZA DE PASAJEROS
+    // =========================================================================
+
+    private void InstanciarPasajeroEnInicio(MissionOrder mision)
+    {
+        // Si la mision tiene un prefab propio lo usa; si no, usa el prefab general por defecto
+        GameObject prefabAUsar = (mision.prefabPasajeroEspecifico != null)
+            ? mision.prefabPasajeroEspecifico
+            : prefabPasajeroPorDefecto;
+
+        if (prefabAUsar == null || mision.puntoDeInicio == null) return;
+
+        Vector3 posSpawn = mision.puntoDeInicio.position + offsetPosicionPasajero;
+        Quaternion rotSpawn = mision.puntoDeInicio.rotation;
+
+        GameObject nuevoPasajero = Instantiate(prefabAUsar, posSpawn, rotSpawn);
+        nuevoPasajero.name = $"Pasajero_N{mision.nivelDeMision}_M{mision.numeroDeMision}";
+
+        pasajerosInstanciadosOfertas.Add(nuevoPasajero);
+    }
+
+    private void ActualizarMiradaDePasajeros()
+    {
+        if (!pasajeroMiraAlJugador || jugadorTransform == null) return;
+
+        foreach (GameObject pasajero in pasajerosInstanciadosOfertas)
+        {
+            if (pasajero == null) continue;
+
+            Vector3 dirAlJugador = jugadorTransform.position - pasajero.transform.position;
+            dirAlJugador.y = 0f;
+
+            if (dirAlJugador.sqrMagnitude > 0.01f)
+            {
+                Quaternion rotacionObjetivo = Quaternion.LookRotation(dirAlJugador.normalized, Vector3.up);
+                pasajero.transform.rotation = Quaternion.Slerp(pasajero.transform.rotation, rotacionObjetivo, 5f * Time.deltaTime);
+            }
+        }
+    }
+
+    private void InstanciarPasajeroBajandoseEnDestino(MissionOrder mision)
+    {
+        if (!instanciarPasajeroAlBajarse) return;
+
+        GameObject prefabAUsar = (mision.prefabPasajeroEspecifico != null)
+            ? mision.prefabPasajeroEspecifico
+            : prefabPasajeroPorDefecto;
+
+        if (prefabAUsar == null) return;
+
+        // Aparece a un costado del jugador (como si bajara de la carroza) y se borra a los 4 segundos
+        Vector3 posBajada = jugadorTransform.position + (jugadorTransform.right * 1.8f) + offsetPosicionPasajero;
+        GameObject pasajeroEntregado = Instantiate(prefabAUsar, posBajada, Quaternion.identity);
+        pasajeroEntregado.name = "Pasajero_Entregado";
+
+        Destroy(pasajeroEntregado, 4f);
+    }
+
+    private void DestruirPasajerosDeOfertas()
+    {
+        for (int i = 0; i < pasajerosInstanciadosOfertas.Count; i++)
+        {
+            if (pasajerosInstanciadosOfertas[i] != null)
+            {
+                Destroy(pasajerosInstanciadosOfertas[i]);
+            }
+        }
+        pasajerosInstanciadosOfertas.Clear();
     }
 
     // =========================================================================
@@ -317,37 +403,38 @@ public class MissionManager : MonoBehaviour
         // 1. CONDICION DE TRIUNFO CERCANA AL CENTRO (OPTIMA)
         if (distanciaFinalAlCentro <= misionAceptadaActual.radioOptimoCentro)
         {
-            Debug.Log($"[MissionManager] TRIUNFO PERFECTO ({categoriaActiva}): Nivel {nivel} - Mision #{numMision} ({nombre}). Distancia al centro: {distanciaFinalAlCentro:F2}m (Dentro del radio optimo de {misionAceptadaActual.radioOptimoCentro}m).");
+            Debug.Log($"[MissionManager] TRIUNFO PERFECTO ({categoriaActiva}): Nivel {nivel} - Mision #{numMision} ({nombre}). Distancia al centro: {distanciaFinalAlCentro:F2}m.");
+
+            InstanciarPasajeroBajandoseEnDestino(misionAceptadaActual);
 
             // =================================================================
             // COMENTARIO DE CONEXION CON GAMEMANAGER (DISTANCIA CERCANA / CENTRO):
             // Agregar aqui la llamada al GameManager para otorgar el PUNTAJE MAXIMO
             // cuando la mision termina muy cerca del centro del punto amarillo.
-            // Ejemplo: GameManager.Instance.SumarPuntajeMision(puntajeMaximo);
             // =================================================================
         }
         // 2. CONDICION DE TRIUNFO LEJANA AL CENTRO (MENOR PUNTAJE)
         else if (distanciaFinalAlCentro <= misionAceptadaActual.radioMaximoLlegada)
         {
-            Debug.Log($"[MissionManager] TRIUNFO CON DISTANCIA LEJANA ({categoriaActiva}): Nivel {nivel} - Mision #{numMision} ({nombre}). Distancia al centro: {distanciaFinalAlCentro:F2}m (Lejos del centro optimo, dentro del radio aceptable de {misionAceptadaActual.radioMaximoLlegada}m).");
+            Debug.Log($"[MissionManager] TRIUNFO CON DISTANCIA LEJANA ({categoriaActiva}): Nivel {nivel} - Mision #{numMision} ({nombre}). Distancia al centro: {distanciaFinalAlCentro:F2}m.");
+
+            InstanciarPasajeroBajandoseEnDestino(misionAceptadaActual);
 
             // =================================================================
             // COMENTARIO DE CONEXION CON GAMEMANAGER (DISTANCIA LEJANA):
             // Agregar aqui la llamada al GameManager para otorgar MENOS PUNTAJE
             // cuando la mision se termina lejos del centro del gran punto amarillo.
-            // Ejemplo: GameManager.Instance.SumarPuntajeMision(puntajeReducido);
             // =================================================================
         }
         // 3. CONDICION DE MISION MAL TERMINADA (FUERA DEL RADIO DE TRIUNFO)
         else
         {
-            Debug.LogWarning($"[MissionManager] MISION MAL TERMINADA / FUERA DE AREA ({categoriaActiva}): Nivel {nivel} - Mision #{numMision} ({nombre}). Distancia: {distanciaFinalAlCentro:F2}m (Fuera del radio maximo de {misionAceptadaActual.radioMaximoLlegada}m).");
+            Debug.LogWarning($"[MissionManager] MISION MAL TERMINADA / FUERA DE AREA ({categoriaActiva}): Nivel {nivel} - Mision #{numMision} ({nombre}). Distancia: {distanciaFinalAlCentro:F2}m.");
 
             // =================================================================
             // COMENTARIO DE CONEXION CON GAMEMANAGER (MISION MAL TERMINADA):
             // Agregar aqui la llamada al GameManager para registrar que la mision
             // fue terminada mal por quedar fuera del radio del punto de triunfo.
-            // Ejemplo: GameManager.Instance.PenalizarMisionFallida();
             // =================================================================
         }
 
@@ -405,9 +492,11 @@ public class MissionManager : MonoBehaviour
         ofertasDisponiblesActuales.Add(misionPrincipal);
 
         ActivarMarcadorOferta(0, misionPrincipal.puntoDeInicio.position, misionPrincipal.radioDeAceptacion, colorIndicadorInicio);
+        InstanciarPasajeroEnInicio(misionPrincipal);
+
         estadoActual = MissionState.OfertasDisponiblesEnMapa;
 
-        Debug.Log($"[MissionManager] MISION PRINCIPAL ACTIVADA (Secuencia #{indiceMisionPrincipalActual + 1}): Nivel {misionPrincipal.nivelDeMision} - Mision #{misionPrincipal.numeroDeMision} ({misionPrincipal.nombreReferencia}). Dirigirse al punto de inicio.");
+        Debug.Log($"[MissionManager] MISION PRINCIPAL ACTIVADA (Secuencia #{indiceMisionPrincipalActual + 1}): Nivel {misionPrincipal.nivelDeMision} - Mision #{misionPrincipal.numeroDeMision}.");
     }
 
     public void CambiarNivelActual(int nuevoNivel)
@@ -487,6 +576,9 @@ public class MissionManager : MonoBehaviour
         }
         if (marcadorVisualDestinoCentro != null) marcadorVisualDestinoCentro.SetActive(false);
         if (marcadorVisualDestinoArea != null) marcadorVisualDestinoArea.SetActive(false);
+
+        // Limpia tambien cualquier pasajero que haya quedado esperando en los puntos azules
+        DestruirPasajerosDeOfertas();
     }
 
     // =========================================================================

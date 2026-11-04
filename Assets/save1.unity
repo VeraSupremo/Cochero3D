@@ -211,6 +211,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionManager
   jugadorTransform: {fileID: 1344351813}
+  prefabPasajeroPorDefecto: {fileID: 3726157839987882284, guid: b781561dfa72bfd4095186102641064e, type: 3}
+  offsetPosicionPasajero: {x: 0, y: 0, z: 0}
+  pasajeroMiraAlJugador: 1
+  instanciarPasajeroAlBajarse: 1
   nivelActual: 1
   tiempoEsperaParaRandom: 12
   cantidadTrabajosSimultaneos: 1
@@ -221,6 +225,7 @@ MonoBehaviour:
     - nombreReferencia: Viaje a Plaza
       nivelDeMision: 1
       numeroDeMision: 1
+      prefabPasajeroEspecifico: {fileID: 0}
       puntoDeInicio: {fileID: 36899578}
       puntoDeLlegada: {fileID: 159530869}
       radioDeAceptacion: 10
@@ -229,6 +234,7 @@ MonoBehaviour:
     - nombreReferencia: Viaje a Mercado
       nivelDeMision: 1
       numeroDeMision: 2
+      prefabPasajeroEspecifico: {fileID: 0}
       puntoDeInicio: {fileID: 28060235}
       puntoDeLlegada: {fileID: 1162171878}
       radioDeAceptacion: 3
@@ -248,6 +254,7 @@ MonoBehaviour:
     nombreReferencia: Nueva Mision
     nivelDeMision: 1
     numeroDeMision: 1
+    prefabPasajeroEspecifico: {fileID: 0}
     puntoDeInicio: {fileID: 0}
     puntoDeLlegada: {fileID: 0}
     radioDeAceptacion: 3.5
@@ -576,6 +583,7 @@ GameObject:
   - component: {fileID: 1339796295}
   - component: {fileID: 1339796294}
   - component: {fileID: 1339796293}
+  - component: {fileID: 1339796296}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -650,13 +658,31 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1339796292}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.63, y: 2.26, z: -31.3}
+  m_LocalRotation: {x: 0.4353052, y: -0, z: -0, w: 0.900283}
+  m_LocalPosition: {x: -2.63, y: 20.44, z: -23.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 51.609, y: 0, z: 0}
+--- !u!114 &1339796296
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1339796292}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06459b9387223304d807e91e6f01cbe0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraTopDown
+  target: {fileID: 1344351813}
+  cameraHeight: 22
+  xzOffset: {x: 0, y: -4}
+  mantenerOffsetInicialDeEscena: 0
+  fixedRotationAngles: {x: 75, y: 0, z: 0}
+  smoothTime: 0.1
 --- !u!1 &1344351812
 GameObject:
   m_ObjectHideFlags: 0

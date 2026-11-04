@@ -228,9 +228,9 @@ MonoBehaviour:
       prefabPasajeroEspecifico: {fileID: 0}
       puntoDeInicio: {fileID: 36899578}
       puntoDeLlegada: {fileID: 159530869}
-      radioDeAceptacion: 2
+      radioDeAceptacion: 10
       radioOptimoCentro: 2.5
-      radioMaximoLlegada: 5
+      radioMaximoLlegada: 8
     - nombreReferencia: Viaje a Mercado
       nivelDeMision: 1
       numeroDeMision: 2
@@ -583,6 +583,7 @@ GameObject:
   - component: {fileID: 1339796295}
   - component: {fileID: 1339796294}
   - component: {fileID: 1339796293}
+  - component: {fileID: 1339796296}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -664,6 +665,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 51.609, y: 0, z: 0}
+--- !u!114 &1339796296
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1339796292}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06459b9387223304d807e91e6f01cbe0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraTopDown
+  target: {fileID: 1344351813}
+  cameraHeight: 22
+  xzOffset: {x: 0, y: -4}
+  mantenerOffsetInicialDeEscena: 0
+  fixedRotationAngles: {x: 75, y: 0, z: 0}
+  smoothTime: 0.1
 --- !u!1 &1344351812
 GameObject:
   m_ObjectHideFlags: 0

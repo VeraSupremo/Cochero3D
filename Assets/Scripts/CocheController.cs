@@ -20,12 +20,14 @@ public class CrazyCarriageController : MonoBehaviour
     public int maxSprintUses = 3;
     public int remainingSprintUses;
 
-    [Header("Velocidades por Etapa")]
-    public float slowSpeed = 6f;
-    public float mediumSpeed = 13f;
-    public float fastSpeed = 22f;
-    public float accelerationRate = 15f;
+    [Header("Velocidades y Frenado (Tecla S)")]
+    public float slowSpeed = 4f;
+    public float mediumSpeed = 10f;
+    public float fastSpeed = 19f;
+    public float accelerationRate = 13f;
     public float decelerationRate = 8f;
+    [Tooltip("Fuerza con la que frena la carroza al mantener presionada la tecla S")]
+    public float brakeRate = 13f;
 
     [Header("Giro Normal (Sin Shift)")]
     public float turnSpeed = 110f;
@@ -48,6 +50,7 @@ public class CrazyCarriageController : MonoBehaviour
     public MovementStage currentStage = MovementStage.Detenido;
     public float currentSpeed;
     public bool isDrifting;
+    public bool isBraking;
     public int spacePressCount;
 
     private Rigidbody rb;
@@ -142,21 +145,25 @@ public class CrazyCarriageController : MonoBehaviour
         bool spacePressed = false;
         turnInput = 0f;
         shiftHeld = false;
+        isBraking = false;
 
         // Input Clásico
         try
         {
             if (Input.GetKeyDown(KeyCode.Space)) spacePressed = true;
             if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) shiftHeld = true;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) isBraking = true;
             turnInput = Input.GetAxisRaw("Horizontal");
         }
         catch { }
 
+        // New Input System (Unity 6)
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
         {
             if (Keyboard.current.spaceKey.wasPressedThisFrame) spacePressed = true;
             if (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed) shiftHeld = true;
+            if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) isBraking = true;
 
             float newTurn = 0f;
             if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) newTurn -= 1f;
@@ -165,7 +172,8 @@ public class CrazyCarriageController : MonoBehaviour
         }
 #endif
 
-        if (spacePressed)
+        // Solo permitimos acelerar con Espacio si NO estamos frenando con la tecla S
+        if (spacePressed && !isBraking)
         {
             spacePressCount++;
             lastInputTime = Time.time;
@@ -183,9 +191,17 @@ public class CrazyCarriageController : MonoBehaviour
 
     private void HandleMovementAndDrift()
     {
-        // 1. Calcular velocidad actual
-        float accel = (currentSpeed < targetMaxSpeed) ? accelerationRate : decelerationRate;
-        currentSpeed = Mathf.MoveTowards(currentSpeed, targetMaxSpeed, accel * Time.fixedDeltaTime);
+        // 1. Calcular velocidad actual (Si mantiene presionada la S, frena con fuerza hacia 0)
+        if (isBraking)
+        {
+            currentSpeed = Mathf.MoveTowards(currentSpeed, 0f, brakeRate * Time.fixedDeltaTime);
+            ApplyBrakingStageSync();
+        }
+        else
+        {
+            float accel = (currentSpeed < targetMaxSpeed) ? accelerationRate : decelerationRate;
+            currentSpeed = Mathf.MoveTowards(currentSpeed, targetMaxSpeed, accel * Time.fixedDeltaTime);
+        }
 
         // 2. ¿Está derrapando? (Requiere presionar Shift, estar doblando e ir suficientemente rápido)
         isDrifting = shiftHeld && Mathf.Abs(turnInput) > 0.01f && currentSpeed >= minSpeedToDrift;
@@ -197,12 +213,10 @@ public class CrazyCarriageController : MonoBehaviour
 
             if (isDrifting)
             {
-                // Con Shift: Giro agresivo y cerrado sin perder capacidad de doblar por ir rápido
                 turnAngle = turnInput * turnSpeed * driftTurnMultiplier * Time.fixedDeltaTime;
             }
             else
             {
-                // Sin Shift: A alta velocidad cuesta más doblar (te obliga a usar Shift en curvas cerradas)
                 float speedPercent = Mathf.Clamp01(currentSpeed / fastSpeed);
                 float turnMod = Mathf.Lerp(1f, highSpeedTurnFactor, speedPercent);
                 turnAngle = turnInput * turnSpeed * turnMod * Time.fixedDeltaTime;
@@ -217,16 +231,36 @@ public class CrazyCarriageController : MonoBehaviour
 
         if (isDrifting)
         {
-            // Mientras derrapa, la dirección de movimiento tarda en alcanzar hacia dónde miran los caballos (patina de costado)
             currentMoveDirection = Vector3.Slerp(currentMoveDirection, desiredForward, driftTraction * Time.fixedDeltaTime).normalized;
         }
         else
         {
-            // Al soltar Shift, recupera el agarre rápidamente
             currentMoveDirection = Vector3.Slerp(currentMoveDirection, desiredForward, 12f * Time.fixedDeltaTime).normalized;
         }
 
         rb.linearVelocity = new Vector3(currentMoveDirection.x * currentSpeed, 0f, currentMoveDirection.z * currentSpeed);
+    }
+
+    // Sincroniza las etapas hacia abajo a medida que frenas con la tecla S para que no vuelva a acelerar solo al soltarla
+    private void ApplyBrakingStageSync()
+    {
+        if (currentSpeed <= 0.2f)
+        {
+            spacePressCount = 0;
+            if (currentStage != MovementStage.Detenido) SetStage(MovementStage.Detenido);
+        }
+        else if (currentSpeed <= slowSpeed)
+        {
+            spacePressCount = Mathf.Min(spacePressCount, 2);
+            if (currentStage != MovementStage.Lento && currentStage != MovementStage.Detenido)
+                SetStage(MovementStage.Lento);
+        }
+        else if (currentSpeed <= mediumSpeed)
+        {
+            spacePressCount = Mathf.Min(spacePressCount, 6);
+            if (currentStage == MovementStage.GalopeRapido)
+                SetStage(MovementStage.Medio);
+        }
     }
 
     private void UpdateCarriageTrailer(bool instant)
@@ -256,7 +290,6 @@ public class CrazyCarriageController : MonoBehaviour
             float moveBlend = Mathf.Clamp01(currentSpeed / slowSpeed);
             Quaternion targetRot = Quaternion.Slerp(horseLookRot, pullRot, moveBlend * 0.7f);
 
-            // EFECTO LATIGAZO EN DERRAPE: Si está derrapando, la carroza se abre hacia afuera de la curva
             if (isDrifting)
             {
                 Quaternion driftSwing = Quaternion.Euler(0f, -turnInput * carriageDriftSwingAngle, 0f);

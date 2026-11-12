@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class LevelManager : MonoBehaviour
 {
@@ -32,7 +32,7 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    //funci�n para procesar los efectos de la luna
+    //función para procesar los efectos de la luna
     private void ApplyMoonPhaseEffects(MoonPhase phase)
     {
         switch (phase)

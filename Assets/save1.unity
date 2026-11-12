@@ -240,8 +240,17 @@ MonoBehaviour:
       radioDeAceptacion: 3
       radioOptimoCentro: 2.5
       radioMaximoLlegada: 5
-  misionesPrincipalesSecuencia: []
-  indiceMisionPrincipalActual: 0
+  misionesPrincipalesSecuencia:
+  - nombreReferencia: Tutorial
+    nivelDeMision: 1
+    numeroDeMision: 1
+    prefabPasajeroEspecifico: {fileID: 3726157839987882284, guid: b781561dfa72bfd4095186102641064e, type: 3}
+    puntoDeInicio: {fileID: 2127807713}
+    puntoDeLlegada: {fileID: 2141832063}
+    radioDeAceptacion: 6
+    radioOptimoCentro: 3
+    radioMaximoLlegada: 8
+  indiceMisionPrincipalActual: 1
   requiereFrenarEnDestino: 1
   velocidadMaximaParaEntregar: 1
   permitirEvaluarConTeclaE: 1
@@ -695,7 +704,9 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 36899578}
+  - {fileID: 2127807713}
   - {fileID: 159530869}
+  - {fileID: 2141832063}
   - {fileID: 28060235}
   - {fileID: 1162171878}
   m_Father: {fileID: 0}
@@ -1727,6 +1738,68 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1939070369}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &2127807712
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2127807713}
+  m_Layer: 0
+  m_Name: Inicio_MP1_N1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2127807713
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2127807712}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 12.92, y: 0, z: -9.17}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 515335954}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2141832062
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2141832063}
+  m_Layer: 0
+  m_Name: Llegada_MP1_N1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2141832063
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2141832062}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 16.14, y: 0, z: 15.65}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 515335954}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

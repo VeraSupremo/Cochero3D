@@ -1,10 +1,10 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 public class GlobalTimeManager : MonoBehaviour
 {
     public static GlobalTimeManager Instance { get; private set; }
 
-    [Header("Configuración de Tiempo")]
+    [Header("ConfiguraciÃ³n de Tiempo")]
     [Tooltip("Segundos reales que dura una hora de juego")]
     public float realSecondsPerHour = 60f; // 1 minuto IRL por defecto
 
@@ -31,26 +31,26 @@ public class GlobalTimeManager : MonoBehaviour
         // Tiempo pausado en Tutorial
         if (isTimePaused) return;
 
-        // Calcula cuántas horas de juego avanzan por cada segundo real transcurrido
+        // Calcula cuÃ¡ntas horas de juego avanzan por cada segundo real transcurrido
         float hoursPerRealSecond = 1f / realSecondsPerHour;
 
         // Avanza la hora del juego usando DeltaTime
         currentHour += Time.deltaTime * hoursPerRealSecond;
 
-        // Corrección del ciclo de 24 horas estándar
+        // CorrecciÃ³n del ciclo de 24 horas estÃ¡ndar
         if (currentHour >= 24f)
         {
             currentHour -= 24f;
         }
 
         // CONTROL DE FIN DE LA NOCHE: Si llega o pasa de las 6:00 AM (pero viene desde la noche)
-        // Usamos un pequeño margen (ej. entre 6:00 y 6:10) para evitar que se active erróneamente al inicializar
+        // Usamos un pequeÃ±o margen (ej. entre 6:00 y 6:10) para evitar que se active errÃ³neamente al inicializar
         if (currentHour >= 6f && currentHour < 7f)
         {
             currentHour = 6f;
             isTimePaused = true;
 
-            //Aquí es donde realmente el juego ejecuta el cambio de noche y fase lunar
+            //AquÃ­ es donde realmente el juego ejecuta el cambio de noche y fase lunar
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.AdvanceMoonPhase();

@@ -8,7 +8,7 @@ using UnityEngine.InputSystem;
 /// Gestor de Misiones (Principales en orden cronológico 1..N y Secundarias estilo Uber).
 /// Controla los círculos de aceptación (Verde para Principales, Azul para Secundarias),
 /// la verificación de la tecla E con su indicador visual [E] en un cuadrado blanco,
-/// la evaluación de puntos con el GameManager y los diálogos entre misiones.
+/// la evaluación de puntos con el GameManager y las conversaciones turno por turno entre misiones.
 /// </summary>
 public class MissionManager : MonoBehaviour
 {
@@ -62,26 +62,25 @@ public class MissionManager : MonoBehaviour
         [Tooltip("Radio EXTERIOR TOTAL del área amarilla (Dejar al pasajero aquí otorga los 10 puntos base en Nivel 1)")]
         public float radioMaximoLlegada = 7.0f;
 
-        [Header("Diálogos Entre Misiones (Solo Misiones Principales)")]
-        [Tooltip("Si está activo, al presionar E para aceptar esta misión el juego se detiene y muestra este diálogo")]
+        [Header("1. Conversación al ACEPTAR la Misión (Orden de hablantes turno por turno)")]
+        [Tooltip("Si está activo, al presionar E en el círculo verde el juego se detiene y muestra esta conversación turno por turno")]
         public bool mostrarDialogoAlAceptar = false;
 
-        [Tooltip("Nombre del personaje que habla al aceptar la misión")]
-        public string personajeDialogoAceptar = "Pasajero";
+        [Tooltip("Música opcional que sonará mientras hablan al aceptar esta misión")]
+        public AudioClip musicaDialogoAlAceptar;
 
-        [Tooltip("Líneas de diálogo que aparecerán al aceptar la misión (una por cada elemento de la lista)")]
-        [TextArea(2, 4)]
-        public List<string> lineasDialogoAlAceptar = new List<string>();
+        [Tooltip("Agrega con '+' cada turno de conversación (ej. Turno 1: Patron -> Turno 2: Chofer -> Turno 3: Perro -> Turno 4: Chofer)")]
+        public List<SistemaDialogos.LineaDeDialogo> conversacionAlAceptar = new List<SistemaDialogos.LineaDeDialogo>();
 
-        [Tooltip("Si está activo, al completar la misión el juego se detiene y muestra este diálogo antes de pasar a la siguiente misión")]
+        [Header("2. Conversación al COMPLETAR la Misión (Entre esta misión y la siguiente)")]
+        [Tooltip("Si está activo, al dejar al pasajero en el destino el juego se detiene y muestra esta conversación antes de pasar a la siguiente misión")]
         public bool mostrarDialogoAlCompletar = false;
 
-        [Tooltip("Nombre del personaje que habla al completar la misión")]
-        public string personajeDialogoCompletar = "Cholito";
+        [Tooltip("Música opcional que sonará mientras hablan al completar esta misión")]
+        public AudioClip musicaDialogoAlCompletar;
 
-        [Tooltip("Líneas de diálogo que aparecerán al completar la misión en su totalidad")]
-        [TextArea(2, 4)]
-        public List<string> lineasDialogoAlCompletar = new List<string>();
+        [Tooltip("Agrega con '+' cada turno de conversación en el orden exacto en que hablan los personajes")]
+        public List<SistemaDialogos.LineaDeDialogo> conversacionAlCompletar = new List<SistemaDialogos.LineaDeDialogo>();
 
         [Header("Estado Cronológico (Solo Lectura)")]
         [Tooltip("Se marca automáticamente cuando el jugador completa esta misión en su totalidad")]
@@ -207,7 +206,6 @@ public class MissionManager : MonoBehaviour
             }
         }
 
-        // Si hay misiones principales pendientes y está activo el orden automático, lanza la Misión Principal #1 de inmediato
         if (priorizarMisionesPrincipalesEnOrden && HayMisionesPrincipalesPendientes())
         {
             LanzarSiguienteMisionPrincipal();
@@ -218,10 +216,6 @@ public class MissionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Verifica que exista un GameManager en la escena para llevar los puntos y diálogos.
-    /// Si no existe, lo crea automáticamente para evitar errores.
-    /// </summary>
     private void AsegurarExistenciaDeGameManager()
     {
         if (GameManager.Instance != null) return;
@@ -234,9 +228,6 @@ public class MissionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Busca automáticamente el objeto Caballos / CrazyCarriageController si no se arrastró en el Inspector.
-    /// </summary>
     private void AutoDetectarJugador()
     {
         if (jugadorTransform == null)
@@ -283,7 +274,7 @@ public class MissionManager : MonoBehaviour
     {
         if (jugadorTransform == null) return;
 
-        // Si el GameManager detuvo el juego por un diálogo entre misiones, no procesamos misiones hasta que termine
+        // Si el GameManager detuvo el juego por una conversación, no procesamos misiones hasta que termine
         if (GameManager.Instance != null && GameManager.Instance.juegoDetenidoPorDialogo)
         {
             ActualizarIndicadorPersonalizadoE(false);
@@ -293,7 +284,6 @@ public class MissionManager : MonoBehaviour
         // Leemos la tecla E una sola vez por frame para diferenciar entre Aceptar Misión y Dejar Pasajero
         bool presionoEEnEsteFrame = SePresionoTeclaE();
 
-        // Si se presiona ENTER, solo relanza misiones secundarias si NO estamos en una Misión Principal obligatoria
         if (SePresionoEnter())
         {
             if (categoriaActiva == MissionCategory.MisionPrincipalHistoria &&
@@ -332,13 +322,11 @@ public class MissionManager : MonoBehaviour
             case MissionState.OfertasDisponiblesEnMapa:
                 jugadorEnAreaDeEntrega = false;
                 ActualizarMiradaDePasajeros();
-                // Verifica si el jugador está dentro del área de aceptación y si presionó la tecla E para aceptar
                 VerificarAceptacionDeMisionEnPuntoDeInicio(presionoEEnEsteFrame);
                 break;
 
             case MissionState.MisionEnCursoHaciaDestino:
                 jugadorEnAreaDeAceptacion = false;
-                // Verifica si el jugador llegó al área amarilla y presionó la tecla E (o frenó) para dejar al pasajero
                 VerificarLlegadaEnPuntoDeTriunfo(presionoEEnEsteFrame);
                 break;
         }
@@ -347,12 +335,9 @@ public class MissionManager : MonoBehaviour
     }
 
     // =========================================================================
-    // SISTEMA ZUBER: SORTEO RANDOM POR NIVEL E INSTANCIACION DE PASAJEROS
+    // SISTEMA UBER: SORTEO RANDOM POR NIVEL E INSTANCIACION DE PASAJEROS
     // =========================================================================
 
-    /// <summary>
-    /// Lanza misiones secundarias aleatorias (círculo azul) correspondientes al nivel indicado.
-    /// </summary>
     public void LanzarRandomMisionPorNivel(int nivel)
     {
         OcultarTodosLosMarcadores();
@@ -389,10 +374,7 @@ public class MissionManager : MonoBehaviour
 
             ofertasDisponiblesActuales.Add(misionElegida);
 
-            // 1. Activar el cilindro AZUL en el suelo para misión secundaria
             ActivarMarcadorOferta(i, misionElegida.puntoDeInicio.position, misionElegida.radioDeAceptacion, colorIndicadorInicio);
-
-            // 2. Instanciar el Prefab del pasajero en ese mismo punto de inicio
             InstanciarPasajeroEnInicio(misionElegida);
 
             Debug.Log($"[MissionManager] Oferta secundaria generada en Nivel {misionElegida.nivelDeMision} | Misión #{misionElegida.numeroDeMision} ({misionElegida.nombreReferencia}). Pasajero esperando en punto AZUL.");
@@ -409,10 +391,6 @@ public class MissionManager : MonoBehaviour
     // VERIFICACION DE ACEPTACION CON TECLA "E" Y CUADRADO BLANCO
     // =========================================================================
 
-    /// <summary>
-    /// Verifica si el jugador se encuentra dentro del radio de aceptación de una misión disponible.
-    /// Si es una Misión Principal (círculo verde), muestra el indicador [E] y SOLO acepta la misión cuando presiona la tecla E.
-    /// </summary>
     private void VerificarAceptacionDeMisionEnPuntoDeInicio(bool presionoTeclaE)
     {
         jugadorEnAreaDeAceptacion = false;
@@ -430,10 +408,8 @@ public class MissionManager : MonoBehaviour
 
                 if (requierePresionarE)
                 {
-                    // El jugador está dentro del área de aceptación: activamos el indicador visual [E] abajo en pantalla
                     jugadorEnAreaDeAceptacion = true;
 
-                    // Solo se acepta la misión cuando el jugador presiona efectivamente la tecla E
                     if (presionoTeclaE)
                     {
                         ConfirmarYAceptarMision(oferta);
@@ -449,20 +425,14 @@ public class MissionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Confirma la recogida del pasajero, oculta el círculo de inicio, muestra el círculo amarillo de destino
-    /// y dispara el diálogo inicial si la misión principal lo tiene configurado.
-    /// </summary>
     private void ConfirmarYAceptarMision(MissionOrder misionConfirmada)
     {
         misionAceptadaActual = misionConfirmada;
         jugadorEstuvoDentroDelArea = false;
         jugadorEnAreaDeAceptacion = false;
 
-        // Oculta los cilindros de inicio y destruye los pasajeros de la calle (simulando que subió a la carroza)
         OcultarTodosLosMarcadores();
 
-        // El indicador pasa a ser amarillo en el Punto de Llegada
         if (misionAceptadaActual.puntoDeLlegada != null)
         {
             ActivarMarcadorDestinoAmarillo(
@@ -476,16 +446,16 @@ public class MissionManager : MonoBehaviour
 
         Debug.Log($"[MissionManager] Pasajero recogido con tecla E y Misión ACEPTADA ({categoriaActiva}): Nivel {misionAceptadaActual.nivelDeMision} - Misión #{misionAceptadaActual.numeroDeMision} ({misionAceptadaActual.nombreReferencia}). Dirigirse al punto AMARILLO.");
 
-        // Si es una Misión Principal y tiene diálogo al aceptar, el GameManager detiene el juego y lanza el diálogo
+        // Si es una Misión Principal y tiene conversación al aceptar, el GameManager detiene el juego y muestra los turnos
         if (categoriaActiva == MissionCategory.MisionPrincipalHistoria &&
             misionAceptadaActual.mostrarDialogoAlAceptar &&
-            misionAceptadaActual.lineasDialogoAlAceptar != null &&
-            misionAceptadaActual.lineasDialogoAlAceptar.Count > 0 &&
+            misionAceptadaActual.conversacionAlAceptar != null &&
+            misionAceptadaActual.conversacionAlAceptar.Count > 0 &&
             GameManager.Instance != null)
         {
-            GameManager.Instance.DetenerJuegoYMostrarDialogo(
-                misionAceptadaActual.personajeDialogoAceptar,
-                misionAceptadaActual.lineasDialogoAlAceptar
+            GameManager.Instance.DetenerJuegoYMostrarConversacion(
+                misionAceptadaActual.conversacionAlAceptar,
+                misionAceptadaActual.musicaDialogoAlAceptar
             );
         }
     }
@@ -494,9 +464,6 @@ public class MissionManager : MonoBehaviour
     // LOGICA DE INSTANCIACION Y LIMPIEZA DE PASAJEROS
     // =========================================================================
 
-    /// <summary>
-    /// Instancia el modelo 3D del pasajero dentro del círculo de inicio de la misión.
-    /// </summary>
     private void InstanciarPasajeroEnInicio(MissionOrder mision)
     {
         GameObject prefabAUsar = (mision.prefabPasajeroEspecifico != null)
@@ -514,9 +481,6 @@ public class MissionManager : MonoBehaviour
         pasajerosInstanciadosOfertas.Add(nuevoPasajero);
     }
 
-    /// <summary>
-    /// Hace que los pasajeros que están esperando en la calle giren suavemente para mirar hacia el jugador.
-    /// </summary>
     private void ActualizarMiradaDePasajeros()
     {
         if (!pasajeroMiraAlJugador || jugadorTransform == null) return;
@@ -536,9 +500,6 @@ public class MissionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Instancia al pasajero al costado de la carroza cuando llega al destino y lo destruye a los 4 segundos.
-    /// </summary>
     private void InstanciarPasajeroBajandoseEnDestino(MissionOrder mision)
     {
         if (!instanciarPasajeroAlBajarse) return;
@@ -556,9 +517,6 @@ public class MissionManager : MonoBehaviour
         Destroy(pasajeroEntregado, 4f);
     }
 
-    /// <summary>
-    /// Elimina de la escena los pasajeros instanciados en los puntos de oferta.
-    /// </summary>
     private void DestruirPasajerosDeOfertas()
     {
         for (int i = 0; i < pasajerosInstanciadosOfertas.Count; i++)
@@ -575,9 +533,6 @@ public class MissionManager : MonoBehaviour
     // EVALUACION DEL PUNTO DE LLEGADA (PUNTO DE TRIUNFO) Y PUNTOS
     // =========================================================================
 
-    /// <summary>
-    /// Verifica si el jugador está en el punto de llegada amarillo y si presionó E o detuvo la carroza para dejar al pasajero.
-    /// </summary>
     private void VerificarLlegadaEnPuntoDeTriunfo(bool presionoTeclaE)
     {
         if (misionAceptadaActual == null || misionAceptadaActual.puntoDeLlegada == null) return;
@@ -606,10 +561,6 @@ public class MissionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Evalúa qué tan cerca del centro amarillo quedó el jugador, otorga los puntos mediante el GameManager,
-    /// ejecuta los diálogos de fin de misión si existen y avanza en el orden cronológico solo si se completó con éxito.
-    /// </summary>
     private void EvaluarResultadoDeMision(float distanciaFinalAlCentro)
     {
         MissionOrder misionEvaluada = misionAceptadaActual;
@@ -622,19 +573,16 @@ public class MissionManager : MonoBehaviour
 
         jugadorEnAreaDeEntrega = false;
 
-        // 1. CONDICION DE TRIUNFO CERCANA AL CENTRO (RADIO PERFECTO)
         if (enRadioPerfecto)
         {
             Debug.Log($"[MissionManager] ¡TRIUNFO EN RADIO PERFECTO! ({categoriaActiva}): Nivel {nivel} - Misión #{numMision} ({nombre}). Distancia al centro: {distanciaFinalAlCentro:F2}m.");
             InstanciarPasajeroBajandoseEnDestino(misionEvaluada);
         }
-        // 2. CONDICION DE TRIUNFO DENTRO DEL AREA AMARILLA NORMAL
         else if (dentroDelRadioMaximo)
         {
             Debug.Log($"[MissionManager] TRIUNFO EN RADIO NORMAL ({categoriaActiva}): Nivel {nivel} - Misión #{numMision} ({nombre}). Distancia al centro: {distanciaFinalAlCentro:F2}m.");
             InstanciarPasajeroBajandoseEnDestino(misionEvaluada);
         }
-        // 3. CONDICION DE MISION MAL TERMINADA (FUERA DEL RADIO DE TRIUNFO)
         else
         {
             Debug.LogWarning($"[MissionManager] MISIÓN FALLIDA / FUERA DE ÁREA ({categoriaActiva}): Nivel {nivel} - Misión #{numMision} ({nombre}). Distancia: {distanciaFinalAlCentro:F2}m.");
@@ -651,7 +599,6 @@ public class MissionManager : MonoBehaviour
         {
             if (dentroDelRadioMaximo)
             {
-                // La misión principal fue completada en su totalidad
                 misionEvaluada.misionCompletada = true;
                 indiceMisionPrincipalActual++;
 
@@ -662,18 +609,17 @@ public class MissionManager : MonoBehaviour
 
                 Debug.Log($"[MissionManager] Misión Principal #{numMision} ({nombre}) completada en su totalidad. Avanzando al índice cronológico: {indiceMisionPrincipalActual}");
 
-                // Limpiamos marcadores antes de mostrar diálogo o pasar a la siguiente misión
                 IniciarEsperaParaNuevaMision();
 
-                // Si esta misión principal tiene diálogo al completarse, el GameManager pausa el juego y muestra el diálogo
+                // Si tiene conversación al completarse, el GameManager pausa el juego y muestra los turnos
                 if (misionEvaluada.mostrarDialogoAlCompletar &&
-                    misionEvaluada.lineasDialogoAlCompletar != null &&
-                    misionEvaluada.lineasDialogoAlCompletar.Count > 0 &&
+                    misionEvaluada.conversacionAlCompletar != null &&
+                    misionEvaluada.conversacionAlCompletar.Count > 0 &&
                     GameManager.Instance != null)
                 {
-                    GameManager.Instance.DetenerJuegoYMostrarDialogo(
-                        misionEvaluada.personajeDialogoCompletar,
-                        misionEvaluada.lineasDialogoAlCompletar,
+                    GameManager.Instance.DetenerJuegoYMostrarConversacion(
+                        misionEvaluada.conversacionAlCompletar,
+                        misionEvaluada.musicaDialogoAlCompletar,
                         () =>
                         {
                             if (priorizarMisionesPrincipalesEnOrden && HayMisionesPrincipalesPendientes())
@@ -687,7 +633,6 @@ public class MissionManager : MonoBehaviour
             }
             else
             {
-                // Si falló la Misión Principal por quedar fuera del área, NO avanza a la siguiente: debe repetirla
                 Debug.LogWarning($"[MissionManager] La Misión Principal #{numMision} NO se completó dentro del área de llegada. Se mantendrá activa para realizarse en orden cronológico.");
                 LanzarSiguienteMisionPrincipal();
                 return;
@@ -697,9 +642,6 @@ public class MissionManager : MonoBehaviour
         IniciarEsperaParaNuevaMision();
     }
 
-    /// <summary>
-    /// Limpia los marcadores actuales y deja el gestor en espera para lanzar la siguiente misión.
-    /// </summary>
     private void IniciarEsperaParaNuevaMision()
     {
         OcultarTodosLosMarcadores();
@@ -716,9 +658,6 @@ public class MissionManager : MonoBehaviour
     // APARTADO EXCLUSIVO: MISIONES PRINCIPALES (ORDEN CRONOLOGICO 1 AL N)
     // =========================================================================
 
-    /// <summary>
-    /// Devuelve true si todavía quedan Misiones Principales sin completar en la lista secuencial.
-    /// </summary>
     public bool HayMisionesPrincipalesPendientes()
     {
         return misionesPrincipalesSecuencia != null &&
@@ -726,10 +665,6 @@ public class MissionManager : MonoBehaviour
                indiceMisionPrincipalActual < misionesPrincipalesSecuencia.Count;
     }
 
-    /// <summary>
-    /// Activa en el mapa la siguiente Misión Principal siguiendo el orden cronológico del 1 al N.
-    /// Su círculo de aceptación es de color VERDE y requiere presionar la tecla E dentro del área.
-    /// </summary>
     [ContextMenu("Lanzar Siguiente Mision Principal")]
     public void LanzarSiguienteMisionPrincipal()
     {
@@ -776,9 +711,6 @@ public class MissionManager : MonoBehaviour
                   $"Entra al círculo VERDE y presiona [E] para aceptarla.");
     }
 
-    /// <summary>
-    /// Actualiza el nivel actual de las misiones.
-    /// </summary>
     public void CambiarNivelActual(int nuevoNivel)
     {
         nivelActual = nuevoNivel;
@@ -864,9 +796,6 @@ public class MissionManager : MonoBehaviour
     // INTERFAZ VISUAL DE LA TECLA "E" DENTRO DE UN CUADRADO BLANCO ABAJO
     // =========================================================================
 
-    /// <summary>
-    /// Activa o desactiva el objeto UI personalizado si fue asignado en el Inspector.
-    /// </summary>
     private void ActualizarIndicadorPersonalizadoE(bool mostrar)
     {
         if (indicadorTeclaEPersonalizadoUI != null && indicadorTeclaEPersonalizadoUI.activeSelf != mostrar)
@@ -881,7 +810,6 @@ public class MissionManager : MonoBehaviour
     /// </summary>
     private void OnGUI()
     {
-        // Si hay un diálogo deteniendo el juego o si se usa un UI propio, no dibujamos el automático
         if (GameManager.Instance != null && GameManager.Instance.juegoDetenidoPorDialogo) return;
         if (indicadorTeclaEPersonalizadoUI != null) return;
         if (!jugadorEnAreaDeAceptacion && !jugadorEnAreaDeEntrega) return;
@@ -892,15 +820,12 @@ public class MissionManager : MonoBehaviour
 
         Color colorOriginal = GUI.color;
 
-        // Sombra/borde exterior oscuro para que el cuadrado blanco resalte sobre cualquier calle
         GUI.color = new Color(0.1f, 0.1f, 0.1f, 0.92f);
         GUI.DrawTexture(new Rect(posX - 3f, posY - 3f, tamanoCuadrado + 6f, tamanoCuadrado + 6f), Texture2D.whiteTexture);
 
-        // Cuadrado blanco simulando la tecla física
         GUI.color = Color.white;
         GUI.DrawTexture(new Rect(posX, posY, tamanoCuadrado, tamanoCuadrado), Texture2D.whiteTexture);
 
-        // Letra "E" centrada dentro del cuadrado blanco
         GUIStyle estiloLetraE = new GUIStyle(GUI.skin.label)
         {
             fontSize = 24,
@@ -911,7 +836,6 @@ public class MissionManager : MonoBehaviour
 
         GUI.Label(new Rect(posX, posY, tamanoCuadrado, tamanoCuadrado), "E", estiloLetraE);
 
-        // Pequeño texto descriptivo justo debajo del cuadrado blanco
         string textoAccion = jugadorEnAreaDeAceptacion ? "Aceptar Misión" : "Dejar Pasajero";
         GUIStyle estiloSubtitulo = new GUIStyle(GUI.skin.label)
         {
@@ -986,7 +910,6 @@ public class MissionManager : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        // Dibujar Misiones Secundarias (Azul / Cyan en Punto de Inicio)
         if (nivelesDeMisiones != null)
         {
             foreach (var pool in nivelesDeMisiones)
@@ -999,7 +922,6 @@ public class MissionManager : MonoBehaviour
             }
         }
 
-        // Dibujar Misiones Principales (Verde en Punto de Inicio)
         if (misionesPrincipalesSecuencia != null)
         {
             foreach (var m in misionesPrincipalesSecuencia)

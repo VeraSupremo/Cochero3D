@@ -13,8 +13,11 @@ public enum MoonPhase
 
 /// <summary>
 /// Gestor principal y global del juego (GameManager).
-/// Controla los niveles de reputación (1 al 5 según el GDD), el sistema de puntaje según el radio de llegada,
-/// la pausa del juego para mostrar diálogos entre misiones principales y el ciclo lunar.
+/// Controla:
+/// 1) Los niveles de reputación (1 al 5) y los puntos según el radio de llegada.
+/// 2) El catálogo global de personajes para diálogos (Iconos, Colores y Sonidos/Ladridos de Patrón, Chofer, Perro, etc.).
+/// 3) La pausa del juego para mostrar conversaciones turno por turno entre Misiones Principales.
+/// 4) El ciclo lunar de las noches.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
@@ -22,13 +25,9 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
 
     // =========================================================================
-    // CLASE DE CONFIGURACION GLOBAL DE NIVELES Y PUNTOS
+    // CLASE 1: CONFIGURACION GLOBAL DE NIVELES Y PUNTOS
     // =========================================================================
 
-    /// <summary>
-    /// Clase configurable en el Inspector que define cuántos puntos da cada misión según el nivel
-    /// y cuántas misiones principales pertenecen a ese nivel.
-    /// </summary>
     [Serializable]
     public class ConfiguracionNivel
     {
@@ -57,10 +56,34 @@ public class GameManager : MonoBehaviour
     }
 
     // =========================================================================
+    // CLASE 2: CATALOGO DE PERSONAJES (ICONOS Y SONIDOS PARA LOS DIALOGOS)
+    // =========================================================================
+
+    /// <summary>
+    /// Permite registrar en el GameManager el icono (Sprite), color y sonido (ej. ladrido o voz)
+    /// de cada personaje ("Patron", "Chofer", "Perro", etc.) para no tener que arrastrar la imagen en cada línea si no quieres.
+    /// </summary>
+    [Serializable]
+    public class PerfilPersonajeDialogo
+    {
+        [Tooltip("Nombre del personaje tal como lo escribirás en la línea de diálogo (ej. Patron, Chofer, Perro, Cholito)")]
+        public string nombrePersonaje = "Chofer";
+
+        [Tooltip("Imagen (Sprite) del personaje que aparecerá destacada sobre el fondo negro semitransparente")]
+        public Sprite iconoPorDefecto;
+
+        [Tooltip("Color con el que se pintará el nombre y el borde de la caja cuando hable este personaje")]
+        public Color colorNombre = new Color(0.3f, 0.95f, 0.45f, 1f);
+
+        [Tooltip("Sonido que se reproducirá cuando le toque hablar a este personaje (ej. ladrido para el Perro, voz para el Patrón)")]
+        public AudioClip sonidoVozPorDefecto;
+    }
+
+    // =========================================================================
     // VARIABLES GLOBALES DE NIVELES Y PUNTAJE
     // =========================================================================
 
-    [Header("Estado Global de Nivel y Puntaje")]
+    [Header("1. Estado Global de Nivel y Puntaje")]
     [Tooltip("Nivel actual del jugador (1 al 5 según el sistema de reputación del GDD)")]
     public int nivelActual = 1;
 
@@ -73,22 +96,28 @@ public class GameManager : MonoBehaviour
     [Tooltip("Cantidad total de misiones principales completadas en toda la partida")]
     public int totalMisionesPrincipalesCompletadas = 0;
 
-    [Header("Configuración de Puntos por Nivel (1 al 5)")]
-    [Tooltip("Lista de niveles con sus respectivos puntajes base y bonos por radio perfecto")]
+    [Header("2. Configuración de Puntos por Nivel (1 al 5)")]
     public List<ConfiguracionNivel> nivelesConfigurados = new List<ConfiguracionNivel>();
 
     // =========================================================================
-    // SISTEMA DE PAUSA Y CONEXION CON SCRIPT DE DIALOGOS
+    // VARIABLES DE PERSONAJES, ICONOS, MUSICA Y DIALOGOS
     // =========================================================================
 
-    [Header("Control de Diálogos entre Misiones Principales")]
-    [Tooltip("Referencia al script de diálogos. Si se deja vacío, el GameManager lo busca o lo crea automáticamente.")]
+    [Header("3. Catálogo de Personajes para Diálogos (Asigna aquí sus Iconos y Sonidos)")]
+    [Tooltip("Lista de personajes (Patrón, Chofer, Perro/Cholito, Pasajero) con su icono y sonido por defecto")]
+    public List<PerfilPersonajeDialogo> catalogoDePersonajes = new List<PerfilPersonajeDialogo>();
+
+    [Header("4. Control de Diálogos y Música entre Misiones Principales")]
+    [Tooltip("Referencia al script SistemaDialogos. Si se deja vacío, el GameManager lo busca o lo crea automáticamente.")]
     public SistemaDialogos scriptDeDialogos;
+
+    [Tooltip("Música general que sonará de fondo cuando se abra un diálogo (si la misión no tiene una música propia)")]
+    public AudioClip musicaGeneralDeDialogos;
 
     [Tooltip("Indica si el juego está detenido actualmente mostrando un diálogo")]
     public bool juegoDetenidoPorDialogo = false;
 
-    [Tooltip("Evento opcional por si deseas conectar un script de diálogo externo desde el Inspector al iniciar un diálogo")]
+    [Tooltip("Evento opcional por si deseas activar algo externo al iniciar un diálogo")]
     public UnityEvent alIniciarDialogoEvento;
 
     [Tooltip("Evento opcional que se dispara cuando termina un diálogo y el juego se reanuda")]
@@ -97,10 +126,10 @@ public class GameManager : MonoBehaviour
     private bool tiempoEstabaPausadoAntesDelDialogo = false;
 
     // =========================================================================
-    // CICLO LUNAR (MANTENIDO PARA COMPATIBILIDAD CON LEVELMANAGER Y GLOBALTIMEMANAGER)
+    // CICLO LUNAR
     // =========================================================================
 
-    [Header("Ciclo Lunar")]
+    [Header("5. Ciclo Lunar")]
     public MoonPhase currentMoonPhase = MoonPhase.New;
     public int nightsInCurrentPhase = 0;
 
@@ -115,6 +144,7 @@ public class GameManager : MonoBehaviour
             Instance = this;
             DontDestroyOnLoad(gameObject);
             InicializarNivelesPorDefecto();
+            InicializarCatalogoPersonajesPorDefecto();
             AsegurarReferenciaScriptDialogos();
         }
         else if (Instance != this)
@@ -124,8 +154,8 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Crea automáticamente la configuración de los 5 niveles del juego si la lista está vacía en el Inspector.
-    /// Configura el Nivel 1 con 10 puntos por misión y 5 puntos por el radio perfecto.
+    /// Crea automáticamente la configuración de los 5 niveles si la lista está vacía en el Inspector.
+    /// Nivel 1 otorga 10 puntos por misión y 5 puntos por el radio perfecto.
     /// </summary>
     public void InicializarNivelesPorDefecto()
     {
@@ -187,6 +217,70 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Crea por defecto las ranuras de personajes ("Patron", "Chofer", "Perro") en el Inspector
+    /// para que solo tengas que arrastrarles su Sprite (icono) y su AudioClip (voz/ladrido).
+    /// </summary>
+    public void InicializarCatalogoPersonajesPorDefecto()
+    {
+        if (catalogoDePersonajes != null && catalogoDePersonajes.Count > 0) return;
+
+        catalogoDePersonajes = new List<PerfilPersonajeDialogo>
+        {
+            new PerfilPersonajeDialogo
+            {
+                nombrePersonaje = "Patron",
+                colorNombre = new Color(1f, 0.8f, 0.25f, 1f) // Dorado para el Patrón
+            },
+            new PerfilPersonajeDialogo
+            {
+                nombrePersonaje = "Chofer",
+                colorNombre = new Color(0.3f, 0.95f, 0.45f, 1f) // Verde espectral para el Chofer / Cochero
+            },
+            new PerfilPersonajeDialogo
+            {
+                nombrePersonaje = "Perro",
+                colorNombre = new Color(0.35f, 0.8f, 1f, 1f) // Celeste para Cholito / el Perro
+            },
+            new PerfilPersonajeDialogo
+            {
+                nombrePersonaje = "Pasajero",
+                colorNombre = new Color(0.85f, 0.6f, 1f, 1f) // Violeta para pasajeros
+            }
+        };
+    }
+
+    /// <summary>
+    /// Busca en el catálogo del GameManager el perfil (icono, color y sonido) del personaje según su nombre.
+    /// </summary>
+    public PerfilPersonajeDialogo ObtenerPerfilDePersonaje(string nombreBuscado)
+    {
+        if (string.IsNullOrEmpty(nombreBuscado) || catalogoDePersonajes == null) return null;
+
+        string limpio = nombreBuscado.Trim().ToLowerInvariant();
+
+        foreach (var perfil in catalogoDePersonajes)
+        {
+            if (perfil == null || string.IsNullOrEmpty(perfil.nombrePersonaje)) continue;
+
+            string nombrePerfil = perfil.nombrePersonaje.Trim().ToLowerInvariant();
+            if (nombrePerfil == limpio)
+            {
+                return perfil;
+            }
+
+            // Sinónimos útiles (ej. "Cholito" o "Perro", "Cochero" o "Chofer", "Patrón" o "Patron")
+            if ((limpio == "cholito" || limpio == "perro") && (nombrePerfil == "cholito" || nombrePerfil == "perro"))
+                return perfil;
+            if ((limpio == "cochero" || limpio == "chofer") && (nombrePerfil == "cochero" || nombrePerfil == "chofer"))
+                return perfil;
+            if ((limpio == "patrón" || limpio == "patron") && (nombrePerfil == "patrón" || nombrePerfil == "patron"))
+                return perfil;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Busca el script SistemaDialogos en la escena o lo agrega automáticamente a este objeto si no existe.
     /// </summary>
     private void AsegurarReferenciaScriptDialogos()
@@ -204,10 +298,6 @@ public class GameManager : MonoBehaviour
     // FUNCIONES DE PUNTUACION SEGUN EL RADIO DE LLEGADA
     // =========================================================================
 
-    /// <summary>
-    /// Obtiene la configuración de puntos correspondiente al número de nivel indicado.
-    /// Si el nivel no existe en la lista, devuelve la configuración del Nivel 1 por seguridad.
-    /// </summary>
     public ConfiguracionNivel ObtenerDatosDelNivel(int numeroDeNivel)
     {
         InicializarNivelesPorDefecto();
@@ -219,19 +309,14 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Calcula y otorga los puntos al jugador en base al nivel de la misión y al radio de llegada donde dejó al pasajero.
-    /// En Nivel 1: otorga 10 puntos por misión y 5 puntos por dejar al pasajero en el radio perfecto.
+    /// Calcula y otorga los puntos al jugador según el nivel y el radio de llegada donde dejó al pasajero.
+    /// En Nivel 1: 10 puntos por misión + 5 puntos si lo deja en el radio perfecto.
     /// </summary>
-    /// <param name="nivelDeMision">Nivel al que pertenece la misión completada.</param>
-    /// <param name="enRadioPerfecto">True si el jugador dejó al pasajero dentro del radio óptimo central.</param>
-    /// <param name="dentroDelRadioMaximo">True si el jugador dejó al pasajero dentro del área amarilla general.</param>
-    /// <returns>Cantidad de puntos ganados (o perdidos) en esta entrega.</returns>
     public int CalcularYOtorgarPuntosPorMision(int nivelDeMision, bool enRadioPerfecto, bool dentroDelRadioMaximo)
     {
         ConfiguracionNivel configNivel = ObtenerDatosDelNivel(nivelDeMision);
         int puntosObtenidos = 0;
 
-        // 1. Dejó al pasajero en el Radio Perfecto (Centro)
         if (enRadioPerfecto)
         {
             puntosObtenidos = configNivel.sumarBonoPerfectoAlBase
@@ -244,7 +329,6 @@ public class GameManager : MonoBehaviour
                       $"+{configNivel.puntosBasePorMision} pts misión +{configNivel.puntosRadioPerfecto} pts radio perfecto = +{puntosObtenidos} pts. " +
                       $"Puntaje Total: {puntajeTotal}");
         }
-        // 2. Dejó al pasajero dentro del Radio Normal de Llegada (lejos del centro pero válido)
         else if (dentroDelRadioMaximo)
         {
             puntosObtenidos = configNivel.puntosBasePorMision;
@@ -253,7 +337,6 @@ public class GameManager : MonoBehaviour
             Debug.Log($"[GameManager] Entrega en radio normal (Nivel {nivelDeMision}): " +
                       $"+{puntosObtenidos} pts. Puntaje Total: {puntajeTotal}");
         }
-        // 3. Dejó al pasajero fuera del área de llegada (Misión Fallida)
         else
         {
             puntosObtenidos = -Mathf.Abs(configNivel.penalizacionFueraDeRadio);
@@ -270,9 +353,6 @@ public class GameManager : MonoBehaviour
     // FUNCIONES DE PROGRESION DE MISIONES PRINCIPALES Y NIVELES
     // =========================================================================
 
-    /// <summary>
-    /// Registra que una misión principal fue completada exitosamente y verifica si corresponde subir de nivel.
-    /// </summary>
     public void RegistrarMisionPrincipalCompletada(int nivelDeLaMision)
     {
         totalMisionesPrincipalesCompletadas++;
@@ -283,7 +363,6 @@ public class GameManager : MonoBehaviour
         Debug.Log($"[GameManager] Misión Principal completada ({misionesPrincipalesCompletadasEnNivel}/{configActual.cantidadMisionesPrincipalesDelNivel} del Nivel {nivelActual}). " +
                   $"Total completadas: {totalMisionesPrincipalesCompletadas}.");
 
-        // Si ya completó todas las misiones principales requeridas en este nivel, avanza al siguiente nivel
         if (configActual.cantidadMisionesPrincipalesDelNivel > 0 &&
             misionesPrincipalesCompletadasEnNivel >= configActual.cantidadMisionesPrincipalesDelNivel)
         {
@@ -291,9 +370,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Cambia el nivel global actual y sincroniza el nivel con el MissionManager si está en la escena.
-    /// </summary>
     public void CambiarDeNivel(int nuevoNivel)
     {
         int maxNivel = (nivelesConfigurados != null && nivelesConfigurados.Count > 0)
@@ -313,20 +389,19 @@ public class GameManager : MonoBehaviour
     }
 
     // =========================================================================
-    // FUNCIONES PARA DETENER EL JUEGO Y EJECUTAR DIALOGOS ENTRE MISIONES
+    // FUNCIONES PARA DETENER EL JUEGO Y EJECUTAR CONVERSACIONES POR TURNOS
     // =========================================================================
 
     /// <summary>
-    /// Detiene el juego por completo (pausa físicas y tiempo), muestra el diálogo llamando al script de diálogos,
-    /// y reanuda automáticamente la partida cuando el jugador termina de leer todas las líneas.
+    /// Detiene el juego por completo, oscurece la pantalla con el fondo negro semitransparente,
+    /// reproduce la música del diálogo y muestra la conversación turno por turno (ej. Patrón -> Chofer -> Perro -> Chofer).
     /// </summary>
-    /// <param name="nombrePersonaje">Nombre de quien habla en el diálogo (ej. "Cholito").</param>
-    /// <param name="lineasDeDialogo">Lista de textos que aparecerán en el diálogo.</param>
-    /// <param name="accionAlFinalizarDialogo">Acción opcional que se ejecutará al cerrarse el diálogo (ej. pasar a la siguiente misión).</param>
-    public void DetenerJuegoYMostrarDialogo(string nombrePersonaje, List<string> lineasDeDialogo, Action accionAlFinalizarDialogo = null)
+    public void DetenerJuegoYMostrarConversacion(
+        List<SistemaDialogos.LineaDeDialogo> conversacion,
+        AudioClip musicaEspecifica = null,
+        Action accionAlFinalizarDialogo = null)
     {
-        // Si no hay líneas configuradas, continuamos de inmediato sin detener el juego
-        if (lineasDeDialogo == null || lineasDeDialogo.Count == 0)
+        if (conversacion == null || conversacion.Count == 0)
         {
             accionAlFinalizarDialogo?.Invoke();
             return;
@@ -337,9 +412,11 @@ public class GameManager : MonoBehaviour
 
         alIniciarDialogoEvento?.Invoke();
 
+        AudioClip musicaAUsar = (musicaEspecifica != null) ? musicaEspecifica : musicaGeneralDeDialogos;
+
         if (scriptDeDialogos != null)
         {
-            scriptDeDialogos.IniciarDialogo(nombrePersonaje, lineasDeDialogo, () =>
+            scriptDeDialogos.IniciarConversacion(conversacion, musicaAUsar, () =>
             {
                 ReanudarJuegoDespuesDeDialogo();
                 alTerminarDialogoEvento?.Invoke();
@@ -348,7 +425,6 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // Respaldo de seguridad si por alguna razón se destruyó el componente de diálogos
             ReanudarJuegoDespuesDeDialogo();
             accionAlFinalizarDialogo?.Invoke();
         }
@@ -368,7 +444,7 @@ public class GameManager : MonoBehaviour
             GlobalTimeManager.Instance.isTimePaused = true;
         }
 
-        Debug.Log("[GameManager] Juego DETENIDO para mostrar secuencia de diálogo.");
+        Debug.Log("[GameManager] Juego DETENIDO para mostrar conversación.");
     }
 
     /// <summary>
@@ -384,16 +460,13 @@ public class GameManager : MonoBehaviour
             GlobalTimeManager.Instance.isTimePaused = tiempoEstabaPausadoAntesDelDialogo;
         }
 
-        Debug.Log("[GameManager] Diálogo terminado. Juego REANUDADO.");
+        Debug.Log("[GameManager] Conversación terminada. Juego REANUDADO.");
     }
 
     // =========================================================================
     // FUNCIONES DE CICLO LUNAR
     // =========================================================================
 
-    /// <summary>
-    /// Avanza la fase lunar al terminar una noche (llamado desde GlobalTimeManager).
-    /// </summary>
     public void AdvanceMoonPhase()
     {
         nightsInCurrentPhase++;

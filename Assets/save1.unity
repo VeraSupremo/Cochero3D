@@ -231,6 +231,13 @@ MonoBehaviour:
       radioDeAceptacion: 10
       radioOptimoCentro: 2.5
       radioMaximoLlegada: 8
+      mostrarDialogoAlAceptar: 0
+      musicaDialogoAlAceptar: {fileID: 0}
+      conversacionAlAceptar: []
+      mostrarDialogoAlCompletar: 0
+      musicaDialogoAlCompletar: {fileID: 0}
+      conversacionAlCompletar: []
+      misionCompletada: 0
     - nombreReferencia: Viaje a Mercado
       nivelDeMision: 1
       numeroDeMision: 2
@@ -240,6 +247,13 @@ MonoBehaviour:
       radioDeAceptacion: 3
       radioOptimoCentro: 2.5
       radioMaximoLlegada: 5
+      mostrarDialogoAlAceptar: 0
+      musicaDialogoAlAceptar: {fileID: 0}
+      conversacionAlAceptar: []
+      mostrarDialogoAlCompletar: 0
+      musicaDialogoAlCompletar: {fileID: 0}
+      conversacionAlCompletar: []
+      misionCompletada: 0
   misionesPrincipalesSecuencia:
   - nombreReferencia: Tutorial
     nivelDeMision: 1
@@ -250,10 +264,39 @@ MonoBehaviour:
     radioDeAceptacion: 6
     radioOptimoCentro: 3
     radioMaximoLlegada: 8
+    mostrarDialogoAlAceptar: 1
+    musicaDialogoAlAceptar: {fileID: 0}
+    conversacionAlAceptar:
+    - nombrePersonaje: Patron
+      textoLinea: LLeveme a la casa, que sofia solabarrieta me esta esperando y estoy
+        corto de tiempo
+      iconoEspecifico: {fileID: 0}
+      sonidoDeEstaLinea: {fileID: 0}
+    - nombrePersonaje: Chofer
+      textoLinea: A su orden patron.
+      iconoEspecifico: {fileID: 0}
+      sonidoDeEstaLinea: {fileID: 0}
+    - nombrePersonaje: Patron
+      textoLinea: Ya ya nada de cuchichear avance.
+      iconoEspecifico: {fileID: 0}
+      sonidoDeEstaLinea: {fileID: 0}
+    - nombrePersonaje: Chofer
+      textoLinea: ...
+      iconoEspecifico: {fileID: 0}
+      sonidoDeEstaLinea: {fileID: 0}
+    mostrarDialogoAlCompletar: 0
+    musicaDialogoAlCompletar: {fileID: 0}
+    conversacionAlCompletar: []
+    misionCompletada: 0
   indiceMisionPrincipalActual: 1
+  reiniciarSecuenciaPrincipalAlIniciar: 1
+  priorizarMisionesPrincipalesEnOrden: 1
+  pedirTeclaETambienEnSecundarias: 0
   requiereFrenarEnDestino: 1
   velocidadMaximaParaEntregar: 1
   permitirEvaluarConTeclaE: 1
+  indicadorTeclaEPersonalizadoUI: {fileID: 0}
+  colorIndicadorMisionPrincipal: {r: 0.1, g: 0.88, b: 0.22, a: 0.78}
   colorIndicadorInicio: {r: 0.1, g: 0.55, b: 1, a: 0.75}
   colorIndicadorLlegada: {r: 1, g: 0.85, b: 0.05, a: 0.8}
   estadoActual: 0
@@ -269,6 +312,15 @@ MonoBehaviour:
     radioDeAceptacion: 3.5
     radioOptimoCentro: 2.5
     radioMaximoLlegada: 7
+    mostrarDialogoAlAceptar: 0
+    musicaDialogoAlAceptar: {fileID: 0}
+    conversacionAlAceptar: []
+    mostrarDialogoAlCompletar: 0
+    musicaDialogoAlCompletar: {fileID: 0}
+    conversacionAlCompletar: []
+    misionCompletada: 0
+  jugadorEnAreaDeAceptacion: 0
+  jugadorEnAreaDeEntrega: 0
 --- !u!4 &61402404
 Transform:
   m_ObjectHideFlags: 0

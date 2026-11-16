@@ -273,15 +273,22 @@ MonoBehaviour:
       iconoEspecifico: {fileID: 0}
       sonidoDeEstaLinea: {fileID: 0}
     - nombrePersonaje: Chofer
-      textoLinea: A su orden patron.
+      textoLinea: Patron dicen que cercano a lo de solabarrieta andan unos bandidos
+        que vienen de la capital.
       iconoEspecifico: {fileID: 0}
       sonidoDeEstaLinea: {fileID: 0}
     - nombrePersonaje: Patron
-      textoLinea: Ya ya nada de cuchichear avance.
+      textoLinea: 'Esos son puros inventos de los liberales, quieren que vivamos
+        con miedo. '
+      iconoEspecifico: {fileID: 0}
+      sonidoDeEstaLinea: {fileID: 0}
+    - nombrePersonaje: Patron
+      textoLinea: Aparte, si yo le digo avance y lleveme usted avanza y me lleva
+        porque estoy apurado, la misa se demoro demasiado.
       iconoEspecifico: {fileID: 0}
       sonidoDeEstaLinea: {fileID: 0}
     - nombrePersonaje: Chofer
-      textoLinea: ...
+      textoLinea: Si patron.
       iconoEspecifico: {fileID: 0}
       sonidoDeEstaLinea: {fileID: 0}
     mostrarDialogoAlCompletar: 0

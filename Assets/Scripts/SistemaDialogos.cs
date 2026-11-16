@@ -9,7 +9,7 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Script encargado de mostrar los diálogos turno por turno (ej. Patrón -> Chofer -> Patrón -> Perro -> Chofer),
 /// oscurecer la pantalla con un fondo negro semitransparente para destacar los iconos de los personajes,
-/// y reproducir música de diálogo o efectos de sonido (como ladridos o voces) en cada línea.
+/// mostrar el Sprite/Diseño del bloque de diálogo y reproducir música o efectos de sonido en cada línea.
 /// </summary>
 public class SistemaDialogos : MonoBehaviour
 {
@@ -19,10 +19,6 @@ public class SistemaDialogos : MonoBehaviour
     // CLASE PARA CADA TURNO / LINEA DE DIALOGO (QUIEN HABLA, TEXTO, ICONO Y SONIDO)
     // =========================================================================
 
-    /// <summary>
-    /// Representa un turno individual dentro de una conversación.
-    /// Permite elegir quién habla en cada línea, qué dice, su icono y su sonido particular.
-    /// </summary>
     [Serializable]
     public class LineaDeDialogo
     {
@@ -51,6 +47,9 @@ public class SistemaDialogos : MonoBehaviour
     [Tooltip("Imagen UI opcional para el fondo negro semitransparente de toda la pantalla")]
     public Image imagenFondoNegroCanvas;
 
+    [Tooltip("Imagen UI opcional para el BLOQUE / CAJA de fondo donde va el texto del diálogo")]
+    public Image imagenBloqueDialogoCanvas;
+
     [Tooltip("Imagen UI opcional donde se mostrará el icono/retrato del personaje que habla")]
     public Image imagenIconoPersonajeCanvas;
 
@@ -60,18 +59,25 @@ public class SistemaDialogos : MonoBehaviour
     [Tooltip("Texto UI opcional para mostrar el diálogo del turno actual")]
     public Text textoContenidoDialogoUI;
 
-    [Header("2. Ajustes del Diseño Automático en Pantalla (Fondo Negro e Iconos)")]
+    // =========================================================================
+    // APARTADO 2: SPRITE DEL BLOQUE DE DIALOGOS Y FONDO NEGRO AUTOMATICO
+    // =========================================================================
+
+    [Header("2. Sprite del Bloque de Diálogos y Fondo Negro Automático")]
+    [Tooltip("¡AQUÍ PUEDES PONER EL SPRITE / IMAGEN DEL BLOQUE DE LOS DIÁLOGOS! Si arrastras un Sprite aquí, se usará como marco/fondo de la caja de texto.")]
+    public Sprite spriteBloqueDeDialogo;
+
     [Tooltip("Color y transparencia del fondo negro que cubre toda la pantalla para destacar a los personajes (Alpha 0.68 = negro medio transparente)")]
     public Color colorFondoPantallaOscura = new Color(0f, 0f, 0f, 0.68f);
 
-    [Tooltip("Color de fondo de la caja inferior donde aparece el texto")]
+    [Tooltip("Color de la caja inferior de texto si NO has asignado un Sprite en 'spriteBloqueDeDialogo'")]
     public Color colorCajaDeTexto = new Color(0.06f, 0.06f, 0.1f, 0.95f);
 
     [Tooltip("Tamaño en píxeles del icono/retrato del personaje cuando habla")]
     public float tamanoIconoPersonaje = 135f;
 
     // =========================================================================
-    // APARTADO 2: MUSICA Y EFECTOS DE SONIDO DE LOS DIALOGOS
+    // APARTADO 3: MUSICA Y EFECTOS DE SONIDO DE LOS DIALOGOS
     // =========================================================================
 
     [Header("3. Música y Sonidos durante los Diálogos")]
@@ -99,7 +105,6 @@ public class SistemaDialogos : MonoBehaviour
     private Action callbackAlFinalizar = null;
     private int frameDeInicioDialogo = -1;
 
-    // Variables cacheadas del turno actual para dibujar rápido en pantalla
     private string nombreActualMostrado = "";
     private string textoActualMostrado = "";
     private Sprite iconoActualMostrado = null;
@@ -125,9 +130,6 @@ public class SistemaDialogos : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Crea automáticamente los componentes AudioSource para la música del diálogo y las voces/ladridos.
-    /// </summary>
     private void ConfigurarFuentesDeAudioAutomaticas()
     {
         if (fuenteAudioMusicaDialogo == null)
@@ -151,7 +153,9 @@ public class SistemaDialogos : MonoBehaviour
     {
         if (!dialogoEnCurso) return;
 
-        // Evita que la misma tecla E con la que aceptaste la misión salte la primera línea en el mismo frame
+        // Si el menú de pausa (Escape) está abierto encima, no avanzamos el diálogo hasta quitar la pausa
+        if (GameManager.Instance != null && GameManager.Instance.juegoPausadoPorEscape) return;
+
         if (Time.frameCount <= frameDeInicioDialogo) return;
 
         if (SePresionoTeclaParaAvanzarDialogo())
@@ -164,13 +168,6 @@ public class SistemaDialogos : MonoBehaviour
     // FUNCIONES PRINCIPALES DE CONVERSACION TURNO POR TURNO
     // =========================================================================
 
-    /// <summary>
-    /// Inicia una conversación completa donde cada línea tiene su propio hablante (ej. Patrón -> Chofer -> Perro -> Chofer).
-    /// Activa el fondo negro semitransparente, la música del diálogo y reproduce el sonido de cada turno.
-    /// </summary>
-    /// <param name="lineasConversacion">Lista ordenada de turnos de diálogo.</param>
-    /// <param name="musicaEspecifica">Música opcional para esta conversación (si es null, usa musicaFondoPorDefecto).</param>
-    /// <param name="alFinalizar">Acción que se ejecuta al cerrar el último turno del diálogo.</param>
     public void IniciarConversacion(List<LineaDeDialogo> lineasConversacion, AudioClip musicaEspecifica = null, Action alFinalizar = null)
     {
         if (lineasConversacion == null || lineasConversacion.Count == 0)
@@ -185,6 +182,12 @@ public class SistemaDialogos : MonoBehaviour
         dialogoEnCurso = true;
         frameDeInicioDialogo = Time.frameCount;
 
+        // Si el GameManager tiene asignado un Sprite para el bloque de diálogos y aquí está vacío, lo tomamos de allá
+        if (spriteBloqueDeDialogo == null && GameManager.Instance != null && GameManager.Instance.spriteBloqueDeDialogos != null)
+        {
+            spriteBloqueDeDialogo = GameManager.Instance.spriteBloqueDeDialogos;
+        }
+
         if (panelDialogoCanvas != null)
         {
             panelDialogoCanvas.SetActive(true);
@@ -193,18 +196,18 @@ public class SistemaDialogos : MonoBehaviour
                 imagenFondoNegroCanvas.color = colorFondoPantallaOscura;
                 imagenFondoNegroCanvas.gameObject.SetActive(true);
             }
+            if (imagenBloqueDialogoCanvas != null && spriteBloqueDeDialogo != null)
+            {
+                imagenBloqueDialogoCanvas.sprite = spriteBloqueDeDialogo;
+            }
         }
 
-        // Iniciar música de fondo del diálogo si está asignada
         AudioClip clipMusica = (musicaEspecifica != null) ? musicaEspecifica : musicaFondoPorDefecto;
         ReproducirMusicaDeDialogo(clipMusica);
 
         MostrarTurnoActual();
     }
 
-    /// <summary>
-    /// Avanza al siguiente turno de la conversación. Si era el último turno, cierra el diálogo y reanuda el juego.
-    /// </summary>
     public void AvanzarSiguienteTurno()
     {
         if (!dialogoEnCurso) return;
@@ -221,9 +224,6 @@ public class SistemaDialogos : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Carga los datos del personaje del turno actual (nombre, texto, icono y sonido/ladrido) y los muestra en pantalla.
-    /// </summary>
     private void MostrarTurnoActual()
     {
         if (indiceTurnoActual < 0 || indiceTurnoActual >= secuenciaActual.Count) return;
@@ -232,22 +232,18 @@ public class SistemaDialogos : MonoBehaviour
         nombreActualMostrado = string.IsNullOrEmpty(linea.nombrePersonaje) ? "Narrador" : linea.nombrePersonaje;
         textoActualMostrado = linea.textoLinea;
 
-        // Buscar si el personaje tiene un perfil global (icono, color, sonido) registrado en el GameManager
         GameManager.PerfilPersonajeDialogo perfil = null;
         if (GameManager.Instance != null)
         {
             perfil = GameManager.Instance.ObtenerPerfilDePersonaje(nombreActualMostrado);
         }
 
-        // 1. Determinar qué icono mostrar (prioriza el de esta línea; si está vacío, usa el del GameManager)
         iconoActualMostrado = (linea.iconoEspecifico != null)
             ? linea.iconoEspecifico
             : (perfil != null ? perfil.iconoPorDefecto : null);
 
-        // 2. Determinar el color del nombre del personaje
         colorNombreActual = (perfil != null) ? perfil.colorNombre : new Color(0.3f, 0.95f, 0.45f, 1f);
 
-        // 3. Reproducir sonido o voz de este turno (ej. ladrido cuando habla el perro)
         AudioClip sonidoTurno = (linea.sonidoDeEstaLinea != null)
             ? linea.sonidoDeEstaLinea
             : (perfil != null ? perfil.sonidoVozPorDefecto : null);
@@ -258,15 +254,11 @@ public class SistemaDialogos : MonoBehaviour
             fuenteAudioEfectosVoz.PlayOneShot(sonidoTurno, volumenEfectosVoz);
         }
 
-        // 4. Actualizar elementos si el usuario conectó un Canvas propio
         ActualizarElementosCanvasPropio();
 
         Debug.Log($"[SistemaDialogos] Turno {indiceTurnoActual + 1}/{secuenciaActual.Count} - Habla '{nombreActualMostrado}': \"{textoActualMostrado}\"");
     }
 
-    /// <summary>
-    /// Cierra el diálogo, detiene la música del diálogo, quita el fondo negro semitransparente y avisa al GameManager.
-    /// </summary>
     public void FinalizarDialogo()
     {
         dialogoEnCurso = false;
@@ -288,9 +280,6 @@ public class SistemaDialogos : MonoBehaviour
     // FUNCIONES DE AUDIO (MUSICA Y EFECTOS EN DIALOGOS)
     // =========================================================================
 
-    /// <summary>
-    /// Reproduce una pista de música mientras dura la conversación.
-    /// </summary>
     public void ReproducirMusicaDeDialogo(AudioClip clipMusica)
     {
         if (clipMusica == null || fuenteAudioMusicaDialogo == null) return;
@@ -300,9 +289,6 @@ public class SistemaDialogos : MonoBehaviour
         fuenteAudioMusicaDialogo.Play();
     }
 
-    /// <summary>
-    /// Detiene la música de fondo del diálogo cuando la conversación termina.
-    /// </summary>
     public void DetenerMusicaDeDialogo()
     {
         if (fuenteAudioMusicaDialogo != null && fuenteAudioMusicaDialogo.isPlaying)
@@ -315,9 +301,6 @@ public class SistemaDialogos : MonoBehaviour
     // DISEÑO DE LOS DIALOGOS (CANVAS PROPIO O DIBUJADO AUTOMATICO EN ONGUI)
     // =========================================================================
 
-    /// <summary>
-    /// Si asignaste un Canvas propio en el Inspector (Apartado 1), aquí se actualizan sus Textos e Imágenes.
-    /// </summary>
     private void ActualizarElementosCanvasPropio()
     {
         if (textoNombrePersonajeUI != null)
@@ -329,6 +312,11 @@ public class SistemaDialogos : MonoBehaviour
         if (textoContenidoDialogoUI != null)
         {
             textoContenidoDialogoUI.text = textoActualMostrado;
+        }
+
+        if (imagenBloqueDialogoCanvas != null && spriteBloqueDeDialogo != null)
+        {
+            imagenBloqueDialogoCanvas.sprite = spriteBloqueDeDialogo;
         }
 
         if (imagenIconoPersonajeCanvas != null)
@@ -346,45 +334,49 @@ public class SistemaDialogos : MonoBehaviour
     }
 
     /// <summary>
-    /// AQUÍ SE GENERA EL DISEÑO AUTOMÁTICO EN PANTALLA (si no asignaste un Canvas en 'panelDialogoCanvas').
-    /// Dibuja:
-    /// 1) El fondo negro medio transparente en toda la pantalla.
-    /// 2) El recuadro e icono/retrato del personaje que está hablando para que destaque.
-    /// 3) La caja de texto inferior con el nombre del hablante y el contador de turnos.
+    /// Dibuja en pantalla el fondo negro medio transparente, el Sprite del bloque de diálogos (si fue asignado),
+    /// el icono del personaje y el texto del turno actual.
     /// </summary>
     private void OnGUI()
     {
+        // Si el menú de pausa (Escape) está abierto, el menú de pausa tiene prioridad en pantalla
+        if (GameManager.Instance != null && GameManager.Instance.juegoPausadoPorEscape) return;
         if (!dialogoEnCurso || panelDialogoCanvas != null) return;
         if (indiceTurnoActual >= secuenciaActual.Count) return;
 
         Color colorOriginal = GUI.color;
 
-        // ---------------------------------------------------------------------
         // 1. FONDO NEGRO MEDIO TRANSPARENTE EN TODA LA PANTALLA
-        // Oscurece el juego detrás para que destaquen los iconos y el diálogo
-        // ---------------------------------------------------------------------
         GUI.color = colorFondoPantallaOscura;
         GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
 
-        // Dimensiones de la caja inferior de diálogo
         float anchoCaja = Mathf.Min(820f, Screen.width - 60f);
         float altoCaja = 165f;
         float posX = (Screen.width - anchoCaja) * 0.5f;
         float posY = Screen.height - altoCaja - 35f;
 
-        // ---------------------------------------------------------------------
-        // 2. CAJA PRINCIPAL DE DIALOGO
-        // ---------------------------------------------------------------------
-        GUI.color = colorCajaDeTexto;
-        GUI.DrawTexture(new Rect(posX, posY, anchoCaja, altoCaja), Texture2D.whiteTexture);
+        // 2. BLOQUE / CAJA PRINCIPAL DE DIALOGO (USA TU SPRITE SI LO ASIGNASTE, O COLOR SOLIDO SI ESTA VACIO)
+        Sprite bloqueAUsar = spriteBloqueDeDialogo;
+        if (bloqueAUsar == null && GameManager.Instance != null)
+        {
+            bloqueAUsar = GameManager.Instance.spriteBloqueDeDialogos;
+        }
 
-        // Línea superior brillante con el color del personaje que habla
-        GUI.color = colorNombreActual;
-        GUI.DrawTexture(new Rect(posX, posY, anchoCaja, 4f), Texture2D.whiteTexture);
+        if (bloqueAUsar != null && bloqueAUsar.texture != null)
+        {
+            GUI.color = Color.white;
+            DibujarSpriteEnOnGUI(new Rect(posX, posY, anchoCaja, altoCaja), bloqueAUsar);
+        }
+        else
+        {
+            GUI.color = colorCajaDeTexto;
+            GUI.DrawTexture(new Rect(posX, posY, anchoCaja, altoCaja), Texture2D.whiteTexture);
 
-        // ---------------------------------------------------------------------
+            GUI.color = colorNombreActual;
+            GUI.DrawTexture(new Rect(posX, posY, anchoCaja, 4f), Texture2D.whiteTexture);
+        }
+
         // 3. ICONO / RETRATO DEL PERSONAJE DESTACADO
-        // ---------------------------------------------------------------------
         float margenTextoIzquierdo = 26f;
 
         if (iconoActualMostrado != null && iconoActualMostrado.texture != null)
@@ -392,11 +384,9 @@ public class SistemaDialogos : MonoBehaviour
             float xIcono = posX + 18f;
             float yIcono = posY + (altoCaja - tamanoIconoPersonaje) * 0.5f;
 
-            // Marco oscuro detrás del retrato del personaje
             GUI.color = new Color(0.15f, 0.15f, 0.2f, 1f);
             GUI.DrawTexture(new Rect(xIcono - 3f, yIcono - 3f, tamanoIconoPersonaje + 6f, tamanoIconoPersonaje + 6f), Texture2D.whiteTexture);
 
-            // Dibujar el Sprite del personaje
             GUI.color = Color.white;
             DibujarSpriteEnOnGUI(new Rect(xIcono, yIcono, tamanoIconoPersonaje, tamanoIconoPersonaje), iconoActualMostrado);
 
@@ -405,9 +395,7 @@ public class SistemaDialogos : MonoBehaviour
 
         GUI.color = colorOriginal;
 
-        // ---------------------------------------------------------------------
         // 4. TEXTOS: NOMBRE DE QUIEN HABLA, MENSAJE E INDICADOR DE CONTINUAR
-        // ---------------------------------------------------------------------
         GUIStyle estiloNombre = new GUIStyle(GUI.skin.label)
         {
             fontSize = 20,
@@ -441,9 +429,6 @@ public class SistemaDialogos : MonoBehaviour
             estiloContinuar);
     }
 
-    /// <summary>
-    /// Dibuja correctamente un Sprite de Unity dentro de un Rect de OnGUI (soportando Sprites individuales o recortados).
-    /// </summary>
     private void DibujarSpriteEnOnGUI(Rect areaDestino, Sprite sprite)
     {
         if (sprite == null || sprite.texture == null) return;
@@ -460,9 +445,6 @@ public class SistemaDialogos : MonoBehaviour
         GUI.DrawTextureWithTexCoords(areaDestino, tex, uv);
     }
 
-    /// <summary>
-    /// Detecta si el jugador presionó E, Espacio, Enter o Clic Izquierdo para pasar al siguiente turno del diálogo.
-    /// </summary>
     private bool SePresionoTeclaParaAvanzarDialogo()
     {
         bool avanzar = false;

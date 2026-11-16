@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public enum MoonPhase
 {
@@ -15,13 +19,13 @@ public enum MoonPhase
 /// Gestor principal y global del juego (GameManager).
 /// Controla:
 /// 1) Los niveles de reputación (1 al 5) y los puntos según el radio de llegada.
-/// 2) El catálogo global de personajes para diálogos (Iconos, Colores y Sonidos/Ladridos de Patrón, Chofer, Perro, etc.).
+/// 2) El catálogo global de personajes para diálogos y el Sprite del bloque de diálogos.
 /// 3) La pausa del juego para mostrar conversaciones turno por turno entre Misiones Principales.
-/// 4) El ciclo lunar de las noches.
+/// 4) El Menú de Pausa al presionar la tecla ESCAPE.
+/// 5) El ciclo lunar de las noches.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
-    // Instancia estática (Singleton) para acceder desde cualquier script usando GameManager.Instance
     public static GameManager Instance { get; private set; }
 
     // =========================================================================
@@ -59,10 +63,6 @@ public class GameManager : MonoBehaviour
     // CLASE 2: CATALOGO DE PERSONAJES (ICONOS Y SONIDOS PARA LOS DIALOGOS)
     // =========================================================================
 
-    /// <summary>
-    /// Permite registrar en el GameManager el icono (Sprite), color y sonido (ej. ladrido o voz)
-    /// de cada personaje ("Patron", "Chofer", "Perro", etc.) para no tener que arrastrar la imagen en cada línea si no quieres.
-    /// </summary>
     [Serializable]
     public class PerfilPersonajeDialogo
     {
@@ -84,30 +84,25 @@ public class GameManager : MonoBehaviour
     // =========================================================================
 
     [Header("1. Estado Global de Nivel y Puntaje")]
-    [Tooltip("Nivel actual del jugador (1 al 5 según el sistema de reputación del GDD)")]
     public int nivelActual = 1;
-
-    [Tooltip("Puntaje total acumulado por el jugador realizando misiones")]
     public int puntajeTotal = 0;
-
-    [Tooltip("Cantidad de misiones principales completadas en el nivel actual")]
     public int misionesPrincipalesCompletadasEnNivel = 0;
-
-    [Tooltip("Cantidad total de misiones principales completadas en toda la partida")]
     public int totalMisionesPrincipalesCompletadas = 0;
 
     [Header("2. Configuración de Puntos por Nivel (1 al 5)")]
     public List<ConfiguracionNivel> nivelesConfigurados = new List<ConfiguracionNivel>();
 
     // =========================================================================
-    // VARIABLES DE PERSONAJES, ICONOS, MUSICA Y DIALOGOS
+    // VARIABLES DE PERSONAJES, BLOQUE DE DIALOGOS Y MUSICA
     // =========================================================================
 
     [Header("3. Catálogo de Personajes para Diálogos (Asigna aquí sus Iconos y Sonidos)")]
-    [Tooltip("Lista de personajes (Patrón, Chofer, Perro/Cholito, Pasajero) con su icono y sonido por defecto")]
     public List<PerfilPersonajeDialogo> catalogoDePersonajes = new List<PerfilPersonajeDialogo>();
 
-    [Header("4. Control de Diálogos y Música entre Misiones Principales")]
+    [Header("4. Bloque Visual y Música de los Diálogos")]
+    [Tooltip("¡Arrastra aquí el Sprite / Imagen de fondo para el BLOQUE (la caja) donde va el texto de los diálogos!")]
+    public Sprite spriteBloqueDeDialogos;
+
     [Tooltip("Referencia al script SistemaDialogos. Si se deja vacío, el GameManager lo busca o lo crea automáticamente.")]
     public SistemaDialogos scriptDeDialogos;
 
@@ -117,24 +112,37 @@ public class GameManager : MonoBehaviour
     [Tooltip("Indica si el juego está detenido actualmente mostrando un diálogo")]
     public bool juegoDetenidoPorDialogo = false;
 
-    [Tooltip("Evento opcional por si deseas activar algo externo al iniciar un diálogo")]
     public UnityEvent alIniciarDialogoEvento;
-
-    [Tooltip("Evento opcional que se dispara cuando termina un diálogo y el juego se reanuda")]
     public UnityEvent alTerminarDialogoEvento;
 
     private bool tiempoEstabaPausadoAntesDelDialogo = false;
 
     // =========================================================================
+    // APARTADO 5: MENU DE PAUSA CON TECLA ESCAPE
+    // =========================================================================
+
+    [Header("5. Menú de Pausa (Tecla Escape)")]
+    [Tooltip("Si está activo, presionar la tecla Escape abre o cierra el menú de pausa deteniendo el juego")]
+    public bool permitirPausaConEscape = true;
+
+    [Tooltip("Indica si el juego está pausado actualmente con el menú de Escape")]
+    public bool juegoPausadoPorEscape = false;
+
+    [Tooltip("Panel de Canvas opcional para tu propio Menú de Pausa. Si lo dejas vacío, el GameManager dibuja el menú de pausa automáticamente en pantalla.")]
+    public GameObject panelMenuPausaCanvas;
+
+    private bool tiempoRelojEstabaPausadoAntesDeEscape = false;
+
+    // =========================================================================
     // CICLO LUNAR
     // =========================================================================
 
-    [Header("5. Ciclo Lunar")]
+    [Header("6. Ciclo Lunar")]
     public MoonPhase currentMoonPhase = MoonPhase.New;
     public int nightsInCurrentPhase = 0;
 
     // =========================================================================
-    // INICIALIZACION
+    // INICIALIZACION Y UPDATE (DETECCION DE ESCAPE)
     // =========================================================================
 
     private void Awake()
@@ -146,6 +154,11 @@ public class GameManager : MonoBehaviour
             InicializarNivelesPorDefecto();
             InicializarCatalogoPersonajesPorDefecto();
             AsegurarReferenciaScriptDialogos();
+
+            if (panelMenuPausaCanvas != null)
+            {
+                panelMenuPausaCanvas.SetActive(false);
+            }
         }
         else if (Instance != this)
         {
@@ -153,10 +166,14 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Crea automáticamente la configuración de los 5 niveles si la lista está vacía en el Inspector.
-    /// Nivel 1 otorga 10 puntos por misión y 5 puntos por el radio perfecto.
-    /// </summary>
+    private void Update()
+    {
+        if (permitirPausaConEscape && SePresionoTeclaEscape())
+        {
+            AlternarMenuDePausa();
+        }
+    }
+
     public void InicializarNivelesPorDefecto()
     {
         if (nivelesConfigurados != null && nivelesConfigurados.Count > 0) return;
@@ -216,10 +233,6 @@ public class GameManager : MonoBehaviour
         };
     }
 
-    /// <summary>
-    /// Crea por defecto las ranuras de personajes ("Patron", "Chofer", "Perro") en el Inspector
-    /// para que solo tengas que arrastrarles su Sprite (icono) y su AudioClip (voz/ladrido).
-    /// </summary>
     public void InicializarCatalogoPersonajesPorDefecto()
     {
         if (catalogoDePersonajes != null && catalogoDePersonajes.Count > 0) return;
@@ -229,29 +242,26 @@ public class GameManager : MonoBehaviour
             new PerfilPersonajeDialogo
             {
                 nombrePersonaje = "Patron",
-                colorNombre = new Color(1f, 0.8f, 0.25f, 1f) // Dorado para el Patrón
+                colorNombre = new Color(1f, 0.8f, 0.25f, 1f)
             },
             new PerfilPersonajeDialogo
             {
                 nombrePersonaje = "Chofer",
-                colorNombre = new Color(0.3f, 0.95f, 0.45f, 1f) // Verde espectral para el Chofer / Cochero
+                colorNombre = new Color(0.3f, 0.95f, 0.45f, 1f)
             },
             new PerfilPersonajeDialogo
             {
                 nombrePersonaje = "Perro",
-                colorNombre = new Color(0.35f, 0.8f, 1f, 1f) // Celeste para Cholito / el Perro
+                colorNombre = new Color(0.35f, 0.8f, 1f, 1f)
             },
             new PerfilPersonajeDialogo
             {
                 nombrePersonaje = "Pasajero",
-                colorNombre = new Color(0.85f, 0.6f, 1f, 1f) // Violeta para pasajeros
+                colorNombre = new Color(0.85f, 0.6f, 1f, 1f)
             }
         };
     }
 
-    /// <summary>
-    /// Busca en el catálogo del GameManager el perfil (icono, color y sonido) del personaje según su nombre.
-    /// </summary>
     public PerfilPersonajeDialogo ObtenerPerfilDePersonaje(string nombreBuscado)
     {
         if (string.IsNullOrEmpty(nombreBuscado) || catalogoDePersonajes == null) return null;
@@ -263,12 +273,8 @@ public class GameManager : MonoBehaviour
             if (perfil == null || string.IsNullOrEmpty(perfil.nombrePersonaje)) continue;
 
             string nombrePerfil = perfil.nombrePersonaje.Trim().ToLowerInvariant();
-            if (nombrePerfil == limpio)
-            {
-                return perfil;
-            }
+            if (nombrePerfil == limpio) return perfil;
 
-            // Sinónimos útiles (ej. "Cholito" o "Perro", "Cochero" o "Chofer", "Patrón" o "Patron")
             if ((limpio == "cholito" || limpio == "perro") && (nombrePerfil == "cholito" || nombrePerfil == "perro"))
                 return perfil;
             if ((limpio == "cochero" || limpio == "chofer") && (nombrePerfil == "cochero" || nombrePerfil == "chofer"))
@@ -280,9 +286,6 @@ public class GameManager : MonoBehaviour
         return null;
     }
 
-    /// <summary>
-    /// Busca el script SistemaDialogos en la escena o lo agrega automáticamente a este objeto si no existe.
-    /// </summary>
     private void AsegurarReferenciaScriptDialogos()
     {
         if (scriptDeDialogos != null) return;
@@ -308,10 +311,6 @@ public class GameManager : MonoBehaviour
         return nivelesConfigurados[0];
     }
 
-    /// <summary>
-    /// Calcula y otorga los puntos al jugador según el nivel y el radio de llegada donde dejó al pasajero.
-    /// En Nivel 1: 10 puntos por misión + 5 puntos si lo deja en el radio perfecto.
-    /// </summary>
     public int CalcularYOtorgarPuntosPorMision(int nivelDeMision, bool enRadioPerfecto, bool dentroDelRadioMaximo)
     {
         ConfiguracionNivel configNivel = ObtenerDatosDelNivel(nivelDeMision);
@@ -392,10 +391,6 @@ public class GameManager : MonoBehaviour
     // FUNCIONES PARA DETENER EL JUEGO Y EJECUTAR CONVERSACIONES POR TURNOS
     // =========================================================================
 
-    /// <summary>
-    /// Detiene el juego por completo, oscurece la pantalla con el fondo negro semitransparente,
-    /// reproduce la música del diálogo y muestra la conversación turno por turno (ej. Patrón -> Chofer -> Perro -> Chofer).
-    /// </summary>
     public void DetenerJuegoYMostrarConversacion(
         List<SistemaDialogos.LineaDeDialogo> conversacion,
         AudioClip musicaEspecifica = null,
@@ -430,9 +425,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Congela el tiempo del juego (Time.timeScale = 0) y pausa el reloj nocturno mientras el diálogo está activo.
-    /// </summary>
     public void PausarJuegoPorDialogo()
     {
         juegoDetenidoPorDialogo = true;
@@ -447,20 +439,195 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] Juego DETENIDO para mostrar conversación.");
     }
 
-    /// <summary>
-    /// Restaura la velocidad normal del juego (Time.timeScale = 1) y el reloj nocturno al terminar el diálogo.
-    /// </summary>
     public void ReanudarJuegoDespuesDeDialogo()
     {
         juegoDetenidoPorDialogo = false;
-        Time.timeScale = 1f;
 
-        if (GlobalTimeManager.Instance != null)
+        // Solo restauramos Time.timeScale a 1 si el menú de Escape no está abierto
+        if (!juegoPausadoPorEscape)
+        {
+            Time.timeScale = 1f;
+        }
+
+        if (GlobalTimeManager.Instance != null && !juegoPausadoPorEscape)
         {
             GlobalTimeManager.Instance.isTimePaused = tiempoEstabaPausadoAntesDelDialogo;
         }
 
         Debug.Log("[GameManager] Conversación terminada. Juego REANUDADO.");
+    }
+
+    // =========================================================================
+    // FUNCIONES DEL MENU DE PAUSA (TECLA ESCAPE)
+    // =========================================================================
+
+    /// <summary>
+    /// Alterna entre abrir y cerrar el menú de pausa cuando el jugador presiona Escape.
+    /// </summary>
+    public void AlternarMenuDePausa()
+    {
+        if (juegoPausadoPorEscape)
+        {
+            ReanudarJuegoDeEscape();
+        }
+        else
+        {
+            PausarJuegoConEscape();
+        }
+    }
+
+    /// <summary>
+    /// Detiene el juego por completo al presionar Escape y muestra el menú de pausa.
+    /// </summary>
+    public void PausarJuegoConEscape()
+    {
+        juegoPausadoPorEscape = true;
+        Time.timeScale = 0f;
+
+        if (GlobalTimeManager.Instance != null)
+        {
+            tiempoRelojEstabaPausadoAntesDeEscape = GlobalTimeManager.Instance.isTimePaused;
+            GlobalTimeManager.Instance.isTimePaused = true;
+        }
+
+        if (panelMenuPausaCanvas != null)
+        {
+            panelMenuPausaCanvas.SetActive(true);
+        }
+
+        Debug.Log("[GameManager] PAUSA ACTIVADA (Tecla Escape).");
+    }
+
+    /// <summary>
+    /// Cierra el menú de pausa y devuelve el juego a su velocidad normal (respetando si había un diálogo abierto).
+    /// </summary>
+    public void ReanudarJuegoDeEscape()
+    {
+        juegoPausadoPorEscape = false;
+
+        if (panelMenuPausaCanvas != null)
+        {
+            panelMenuPausaCanvas.SetActive(false);
+        }
+
+        if (!juegoDetenidoPorDialogo)
+        {
+            Time.timeScale = 1f;
+
+            if (GlobalTimeManager.Instance != null)
+            {
+                GlobalTimeManager.Instance.isTimePaused = tiempoRelojEstabaPausadoAntesDeEscape;
+            }
+        }
+
+        Debug.Log("[GameManager] PAUSA DESACTIVADA. Juego reanudado.");
+    }
+
+    /// <summary>
+    /// Reinicia la escena actual desde el menú de pausa.
+    /// </summary>
+    public void ReiniciarEscenaActual()
+    {
+        juegoPausadoPorEscape = false;
+        juegoDetenidoPorDialogo = false;
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    /// <summary>
+    /// Cierra la aplicación (o detiene el modo Play si estás en el Editor de Unity).
+    /// </summary>
+    public void SalirDelJuego()
+    {
+        Debug.Log("[GameManager] Saliendo del juego...");
+        Application.Quit();
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#endif
+    }
+
+    /// <summary>
+    /// Dibuja automáticamente el Menú de Pausa en pantalla si no asignaste un Panel propio en 'panelMenuPausaCanvas'.
+    /// </summary>
+    private void OnGUI()
+    {
+        if (!juegoPausadoPorEscape || panelMenuPausaCanvas != null) return;
+
+        Color colorOriginal = GUI.color;
+
+        // Fondo negro medio transparente cubriendo toda la pantalla
+        GUI.color = new Color(0f, 0f, 0f, 0.75f);
+        GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+
+        float anchoMenu = 340f;
+        float altoMenu = 260f;
+        float xMenu = (Screen.width - anchoMenu) * 0.5f;
+        float yMenu = (Screen.height - altoMenu) * 0.5f;
+
+        // Caja central del menú de pausa
+        GUI.color = new Color(0.08f, 0.08f, 0.12f, 0.96f);
+        GUI.DrawTexture(new Rect(xMenu, yMenu, anchoMenu, altoMenu), Texture2D.whiteTexture);
+
+        // Borde superior verde/dorado
+        GUI.color = new Color(0.2f, 0.88f, 0.35f, 1f);
+        GUI.DrawTexture(new Rect(xMenu, yMenu, anchoMenu, 4f), Texture2D.whiteTexture);
+
+        GUI.color = colorOriginal;
+
+        GUIStyle estiloTitulo = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 24,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter
+        };
+        estiloTitulo.normal.textColor = Color.white;
+
+        GUI.Label(new Rect(xMenu, yMenu + 20f, anchoMenu, 36f), "JUEGO EN PAUSA", estiloTitulo);
+
+        GUIStyle estiloBoton = new GUIStyle(GUI.skin.button)
+        {
+            fontSize = 16,
+            fontStyle = FontStyle.Bold
+        };
+
+        float anchoBoton = 240f;
+        float altoBoton = 42f;
+        float xBoton = xMenu + (anchoMenu - anchoBoton) * 0.5f;
+
+        if (GUI.Button(new Rect(xBoton, yMenu + 80f, anchoBoton, altoBoton), "Reanudar (Esc)", estiloBoton))
+        {
+            ReanudarJuegoDeEscape();
+        }
+
+        if (GUI.Button(new Rect(xBoton, yMenu + 134f, anchoBoton, altoBoton), "Reiniciar Nivel", estiloBoton))
+        {
+            ReiniciarEscenaActual();
+        }
+
+        if (GUI.Button(new Rect(xBoton, yMenu + 188f, anchoBoton, altoBoton), "Salir del Juego", estiloBoton))
+        {
+            SalirDelJuego();
+        }
+    }
+
+    private bool SePresionoTeclaEscape()
+    {
+        bool escape = false;
+
+        try
+        {
+            if (Input.GetKeyDown(KeyCode.Escape)) escape = true;
+        }
+        catch { }
+
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            escape = true;
+        }
+#endif
+
+        return escape;
     }
 
     // =========================================================================

@@ -274,8 +274,8 @@ public class MissionManager : MonoBehaviour
     {
         if (jugadorTransform == null) return;
 
-        // Si el GameManager detuvo el juego por una conversación, no procesamos misiones hasta que termine
-        if (GameManager.Instance != null && GameManager.Instance.juegoDetenidoPorDialogo)
+        // Si el GameManager detuvo el juego por una conversación o por el Menú de Pausa (Escape), no procesamos misiones
+        if (GameManager.Instance != null && (GameManager.Instance.juegoDetenidoPorDialogo || GameManager.Instance.juegoPausadoPorEscape))
         {
             ActualizarIndicadorPersonalizadoE(false);
             return;
@@ -810,7 +810,7 @@ public class MissionManager : MonoBehaviour
     /// </summary>
     private void OnGUI()
     {
-        if (GameManager.Instance != null && GameManager.Instance.juegoDetenidoPorDialogo) return;
+        if (GameManager.Instance != null && (GameManager.Instance.juegoDetenidoPorDialogo || GameManager.Instance.juegoPausadoPorEscape)) return;
         if (indicadorTeclaEPersonalizadoUI != null) return;
         if (!jugadorEnAreaDeAceptacion && !jugadorEnAreaDeEntrega) return;
 

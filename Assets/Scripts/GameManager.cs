@@ -582,7 +582,7 @@ public class GameManager : MonoBehaviour
         };
         estiloTitulo.normal.textColor = Color.white;
 
-        GUI.Label(new Rect(xMenu, yMenu + 20f, anchoMenu, 36f), "JUEGO EN PAUSA", estiloTitulo);
+        GUI.Label(new Rect(xMenu, yMenu + 20f, anchoMenu, 36f), "PAUSA", estiloTitulo);
 
         GUIStyle estiloBoton = new GUIStyle(GUI.skin.button)
         {
@@ -599,7 +599,7 @@ public class GameManager : MonoBehaviour
             ReanudarJuegoDeEscape();
         }
 
-        if (GUI.Button(new Rect(xBoton, yMenu + 134f, anchoBoton, altoBoton), "Reiniciar Nivel", estiloBoton))
+        if (GUI.Button(new Rect(xBoton, yMenu + 134f, anchoBoton, altoBoton), "Reiniciar", estiloBoton))
         {
             ReiniciarEscenaActual();
         }

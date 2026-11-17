@@ -347,6 +347,7 @@ public class SistemaDialogos : MonoBehaviour
         Color colorOriginal = GUI.color;
 
         // 1. FONDO NEGRO MEDIO TRANSPARENTE EN TODA LA PANTALLA
+        // se puede cambiar si se hace un diseño de bloque
         GUI.color = colorFondoPantallaOscura;
         GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
 

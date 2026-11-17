@@ -559,8 +559,8 @@ public class GameManager : MonoBehaviour
         GUI.color = new Color(0f, 0f, 0f, 0.75f);
         GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
 
-        float anchoMenu = 340f;
-        float altoMenu = 260f;
+        float anchoMenu = 480f;
+        float altoMenu = 360f;
         float xMenu = (Screen.width - anchoMenu) * 0.5f;
         float yMenu = (Screen.height - altoMenu) * 0.5f;
 

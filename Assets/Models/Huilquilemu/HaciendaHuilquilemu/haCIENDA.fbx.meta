@@ -3,7 +3,37 @@ guid: e068aa38ab8167a43a633455e8795f7e
 ModelImporter:
   serializedVersion: 24501
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Texture2D
+      assembly: UnityEngine.CoreModule
+      name: Bricks
+    second: {fileID: 2800000, guid: 544a30522eb67ff46b1dbc310dffc18c, type: 3}
+  - first:
+      type: UnityEngine:Texture2D
+      assembly: UnityEngine.CoreModule
+      name: Puertacienda
+    second: {fileID: 2800000, guid: edc033c1129112843b4f0a18ebf08dc0, type: 3}
+  - first:
+      type: UnityEngine:Texture2D
+      assembly: UnityEngine.CoreModule
+      name: Tejas
+    second: {fileID: 2800000, guid: 7595adf652ff4f747859a9f279362e6b, type: 3}
+  - first:
+      type: UnityEngine:Texture2D
+      assembly: UnityEngine.CoreModule
+      name: Viga
+    second: {fileID: 2800000, guid: 2060ce7001c2b514ca7459246ae1433d, type: 3}
+  - first:
+      type: UnityEngine:Texture2D
+      assembly: UnityEngine.CoreModule
+      name: VioletFlowers
+    second: {fileID: 2800000, guid: 16004611deabccd40a3eafedaf1740d0, type: 3}
+  - first:
+      type: UnityEngine:Texture2D
+      assembly: UnityEngine.CoreModule
+      name: WindownHacienda
+    second: {fileID: 2800000, guid: 03154ced4153ddf439b343545509e71b, type: 3}
   materials:
     materialImportMode: 2
     materialName: 0

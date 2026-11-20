@@ -96,15 +96,34 @@ public class MedVelocidad : MonoBehaviour
 
     private void Awake()
     {
+        AutoDetectarPlanosEnCanvas();
         AutoDetectarProtagonista();
         AplicarSpritesSiFueronAsignados();
     }
 
     private void Start()
     {
+        AutoDetectarPlanosEnCanvas();
         AutoDetectarProtagonista();
         posXActual = posXDetenido;
         ActualizarPosicionYRotacionDeVarilla(true);
+    }
+
+    /// <summary>
+    /// Si pusiste el script MedVelocidad en el Plano 1 (Fondo) y el Plano 2 (Varilla) es su hijo,
+    /// los detecta automáticamente aunque olvides arrastrarlos en el Inspector.
+    /// </summary>
+    private void AutoDetectarPlanosEnCanvas()
+    {
+        if (planoFondoBarra == null)
+        {
+            planoFondoBarra = GetComponent<RectTransform>();
+        }
+
+        if (planoVarillaIndicadora == null && transform.childCount > 0)
+        {
+            planoVarillaIndicadora = transform.GetChild(0).GetComponent<RectTransform>();
+        }
     }
 
     private void Update()

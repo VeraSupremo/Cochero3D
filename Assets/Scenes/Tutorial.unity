@@ -225,42 +225,7 @@ MonoBehaviour:
   nivelActual: 1
   tiempoEsperaParaRandom: 12
   cantidadTrabajosSimultaneos: 1
-  nivelesDeMisiones:
-  - nombreDelNivel: Viaje a Plaza
-    numeroNivel: 1
-    misionesDelNivel:
-    - nombreReferencia: Viaje a Plaza
-      nivelDeMision: 1
-      numeroDeMision: 1
-      prefabPasajeroEspecifico: {fileID: 0}
-      puntoDeInicio: {fileID: 0}
-      puntoDeLlegada: {fileID: 0}
-      radioDeAceptacion: 10
-      radioOptimoCentro: 2.5
-      radioMaximoLlegada: 8
-      mostrarDialogoAlAceptar: 0
-      musicaDialogoAlAceptar: {fileID: 0}
-      conversacionAlAceptar: []
-      mostrarDialogoAlCompletar: 0
-      musicaDialogoAlCompletar: {fileID: 0}
-      conversacionAlCompletar: []
-      misionCompletada: 0
-    - nombreReferencia: Viaje a Mercado
-      nivelDeMision: 1
-      numeroDeMision: 2
-      prefabPasajeroEspecifico: {fileID: 0}
-      puntoDeInicio: {fileID: 0}
-      puntoDeLlegada: {fileID: 0}
-      radioDeAceptacion: 3
-      radioOptimoCentro: 2.5
-      radioMaximoLlegada: 5
-      mostrarDialogoAlAceptar: 0
-      musicaDialogoAlAceptar: {fileID: 0}
-      conversacionAlAceptar: []
-      mostrarDialogoAlCompletar: 0
-      musicaDialogoAlCompletar: {fileID: 0}
-      conversacionAlCompletar: []
-      misionCompletada: 0
+  nivelesDeMisiones: []
   misionesPrincipalesSecuencia:
   - nombreReferencia: Tutorial
     nivelDeMision: 1
@@ -268,6 +233,72 @@ MonoBehaviour:
     prefabPasajeroEspecifico: {fileID: 3726157839987882284, guid: b781561dfa72bfd4095186102641064e, type: 3}
     puntoDeInicio: {fileID: 2127807713}
     puntoDeLlegada: {fileID: 2141832063}
+    puntosIntermedios:
+    - nombreReferenciaPunto: PrevioALAtaque
+      ordenDelPunto: 1
+      puntoIntermedioTransform: {fileID: 2055340591}
+      radioDeActivacion: 9
+      mostrarCirculoEnSuelo: 1
+      musicaDialogoIntermedio: {fileID: 0}
+      conversacionPuntoIntermedio:
+      - nombrePersonaje: Cochero
+        textoLinea: "Oiga Patron sabe, esta ruta esta rara mi \xF1ora me dijo que
+          esta gente estan con el diaulo y yo no traje ni el rosario, no sera mejor
+          devolverse?"
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: Patron
+        textoLinea: "No se invente cuentos y avance o lo hecho a usted y a su se\xF1ora
+          cascando del fundo"
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: Cochero
+        textoLinea: .....
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      yaFueActivado: 0
+    - nombreReferenciaPunto: Ataque
+      ordenDelPunto: 2
+      puntoIntermedioTransform: {fileID: 206493748}
+      radioDeActivacion: 9
+      mostrarCirculoEnSuelo: 1
+      musicaDialogoIntermedio: {fileID: 0}
+      conversacionPuntoIntermedio:
+      - nombrePersonaje: Asaltante
+        textoLinea: PARA LA WEA PARA LA WEA!!!!!
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: Patron
+        textoLinea: Dios mio
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: Cochero
+        textoLinea: VAYANSE DE AQUI, MALANDROS HIJOS DEL DIAULO
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: Asaltante
+        textoLinea: CAYAO Y PASA EL CAALLO
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: Asaltante
+        textoLinea: '*ruidos de Sable*'
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: Asaltante
+        textoLinea: AAAAAAAAAAAH..... que Dios se apiade de nosotros
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: Patron
+        textoLinea: "Dios te Salve Maria, llena eres de Gracia, el se\xF1or es contigo,
+          bendita eres entre todas las mujeres y bendito sea el fruto de tu vientre
+          Jesus."
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      - nombrePersonaje: ...
+        textoLinea: '*ruidos incomprensibles*'
+        iconoEspecifico: {fileID: 0}
+        sonidoDeEstaLinea: {fileID: 0}
+      yaFueActivado: 0
     radioDeAceptacion: 6
     radioOptimoCentro: 3
     radioMaximoLlegada: 8
@@ -311,6 +342,7 @@ MonoBehaviour:
   permitirEvaluarConTeclaE: 1
   indicadorTeclaEPersonalizadoUI: {fileID: 0}
   colorIndicadorMisionPrincipal: {r: 0.1, g: 0.88, b: 0.22, a: 0.78}
+  colorIndicadorPuntoIntermedio: {r: 0.15, g: 0.95, b: 0.65, a: 0.65}
   colorIndicadorInicio: {r: 0.1, g: 0.55, b: 1, a: 0.75}
   colorIndicadorLlegada: {r: 1, g: 0.85, b: 0.05, a: 0.8}
   estadoActual: 0
@@ -323,6 +355,7 @@ MonoBehaviour:
     prefabPasajeroEspecifico: {fileID: 0}
     puntoDeInicio: {fileID: 0}
     puntoDeLlegada: {fileID: 0}
+    puntosIntermedios: []
     radioDeAceptacion: 3.5
     radioOptimoCentro: 2.5
     radioMaximoLlegada: 7
@@ -333,6 +366,7 @@ MonoBehaviour:
     musicaDialogoAlCompletar: {fileID: 0}
     conversacionAlCompletar: []
     misionCompletada: 0
+  indicePuntoIntermedioActual: 0
   jugadorEnAreaDeAceptacion: 0
   jugadorEnAreaDeEntrega: 0
 --- !u!4 &61402404
@@ -730,6 +764,37 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &206493747
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 206493748}
+  m_Layer: 0
+  m_Name: Intermedio_MP1_2
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &206493748
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 206493747}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.19137993, y: -0, z: -0, w: 0.98151606}
+  m_LocalPosition: {x: -64.7, y: -3.1, z: -270.1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 515335954}
+  m_LocalEulerAnglesHint: {x: -22.067, y: 0, z: 0}
 --- !u!64 &273815569
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1148,6 +1213,8 @@ Transform:
   m_Children:
   - {fileID: 2127807713}
   - {fileID: 2141832063}
+  - {fileID: 2055340591}
+  - {fileID: 206493748}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!64 &564999815
@@ -2850,11 +2917,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraTopDown
   target: {fileID: 1344351813}
-  cameraHeight: 22
-  xzOffset: {x: 0, y: -4}
-  mantenerOffsetInicialDeEscena: 0
-  fixedRotationAngles: {x: 75, y: 0, z: 0}
+  distanciaDetras: 10.5
+  alturaCamara: 5.2
+  alturaPuntoDeMira: 2.2
+  adelantoPuntoDeMira: 2.5
+  rigidezRotacionEspalda: 9
   smoothTime: 0.1
+  permitirMirarUnPocoConMouse: 1
+  sensibilidadMouse: 1.4
+  limiteMouseHorizontal: 18
+  limiteMouseVertical: 8
+  velocidadRetornoCentroMouse: 4
+  esquivarEdificios: 1
+  radioColisionCamara: 0.45
+  margenSeparacionPared: 0.35
+  distanciaEsquiveLateral: 2.2
+  distanciaMinimaAlJugador: 2
+  capasDeEdificios:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &1344351812
 GameObject:
   m_ObjectHideFlags: 0
@@ -3878,6 +3959,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1972258494}
   m_CullTransparentMesh: 1
+--- !u!1 &2055340590
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2055340591}
+  m_Layer: 0
+  m_Name: Intermedio_MP1_1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2055340591
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2055340590}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.19137993, y: -0, z: -0, w: 0.98151606}
+  m_LocalPosition: {x: -374.05, y: -3.21, z: -141}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 515335954}
+  m_LocalEulerAnglesHint: {x: -22.067, y: 0, z: 0}
 --- !u!1 &2127807712
 GameObject:
   m_ObjectHideFlags: 0

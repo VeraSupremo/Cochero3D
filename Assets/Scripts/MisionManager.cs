@@ -7,8 +7,8 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Gestor de Misiones (Principales en orden cronológico 1..N y Secundarias estilo Uber).
 /// Controla los círculos de aceptación (Verde para Principales, Azul para Secundarias),
-/// la verificación de la tecla E con su indicador visual [E] en un cuadrado blanco,
-/// la evaluación de puntos con el GameManager y las conversaciones turno por turno entre misiones.
+/// los Puntos Intermedios (1 al N) que activan diálogos automáticamente cuando el jugador pasa por ellos,
+/// la verificación de la tecla E con su cuadrado blanco [E] y la evaluación de puntos con el GameManager.
 /// </summary>
 public class MissionManager : MonoBehaviour
 {
@@ -23,6 +23,44 @@ public class MissionManager : MonoBehaviour
     {
         EncargoUberAleatorio,
         MisionPrincipalHistoria
+    }
+
+    // =========================================================================
+    // CLASE PARA PUNTOS INTERMEDIOS DE MISION (1 AL N - ACTIVAN DIALOGOS AL PASAR)
+    // =========================================================================
+
+    /// <summary>
+    /// Representa un punto intermedio en el camino de una Misión Principal (del 1 al N).
+    /// Cuando el jugador pasa por su radio durante la misión, detiene el juego y lanza una conversación
+    /// para explicar mecánicas, historia o indicaciones antes de llegar al destino final.
+    /// </summary>
+    [System.Serializable]
+    public class PuntoIntermedioMision
+    {
+        [Tooltip("Nombre referencial en el Inspector (ej. Punto 1 - Explicación de Derrape en la esquina)")]
+        public string nombreReferenciaPunto = "Punto Intermedio 1";
+
+        [Tooltip("Orden sucesivo de este punto intermedio (1, 2, 3... N)")]
+        public int ordenDelPunto = 1;
+
+        [Tooltip("GameObject vacío en el mapa por donde debe pasar el jugador para activar el diálogo")]
+        public Transform puntoIntermedioTransform;
+
+        [Tooltip("Tamaño del área: apenas el jugador pase dentro de este radio, se activará el diálogo automáticamente")]
+        public float radioDeActivacion = 5.5f;
+
+        [Tooltip("Si está activo, muestra un círculo guía en el suelo en este punto intermedio hasta que pases por él")]
+        public bool mostrarCirculoEnSuelo = true;
+
+        [Tooltip("Música opcional que sonará durante el diálogo de este punto intermedio")]
+        public AudioClip musicaDialogoIntermedio;
+
+        [Tooltip("Conversación turno por turno que aparecerá cuando el jugador pase por este punto intermedio")]
+        public List<SistemaDialogos.LineaDeDialogo> conversacionPuntoIntermedio = new List<SistemaDialogos.LineaDeDialogo>();
+
+        [Header("Estado (Solo Lectura)")]
+        [Tooltip("Se marca automáticamente cuando el jugador ya pasó por este punto en la misión actual")]
+        public bool yaFueActivado = false;
     }
 
     // =========================================================================
@@ -45,12 +83,16 @@ public class MissionManager : MonoBehaviour
         [Tooltip("Si lo dejas vacío, usará el Prefab de Pasajero por Defecto del MissionManager")]
         public GameObject prefabPasajeroEspecifico;
 
-        [Header("Puntos Vacíos del Mapa (Transforms)")]
+        [Header("Puntos Vacíos del Mapa (Inicio y Llegada)")]
         [Tooltip("GameObject vacío donde aparece el círculo de aceptación y el pasajero esperando")]
         public Transform puntoDeInicio;
 
         [Tooltip("GameObject vacío que actúa como Punto de Llegada / Triunfo (Gran círculo amarillo)")]
         public Transform puntoDeLlegada;
+
+        [Header("Puntos Intermedios de Diálogo (1 al N - Al pasar por el camino)")]
+        [Tooltip("Agrega con '+' de 1 a N puntos intermedios. Al pasar por cada uno durante el viaje, se activará su diálogo.")]
+        public List<PuntoIntermedioMision> puntosIntermedios = new List<PuntoIntermedioMision>();
 
         [Header("Radios del Punto de Inicio y Triunfo")]
         [Tooltip("Radio del círculo donde el jugador debe entrar y presionar E para aceptar la misión")]
@@ -160,6 +202,8 @@ public class MissionManager : MonoBehaviour
     [Header("Colores de los Indicadores en el Mapa")]
     [Tooltip("Color VERDE para el radio de aceptación de las Misiones Principales")]
     public Color colorIndicadorMisionPrincipal = new Color(0.1f, 0.88f, 0.22f, 0.78f); // Verde para Misión Principal
+    [Tooltip("Color VERDE AGUA / TURQUESA para los Puntos Intermedios (1 al N) de diálogo")]
+    public Color colorIndicadorPuntoIntermedio = new Color(0.15f, 0.95f, 0.65f, 0.65f); // Verde agua para Punto Intermedio
     [Tooltip("Color AZUL para el radio de aceptación de las Misiones Secundarias")]
     public Color colorIndicadorInicio = new Color(0.1f, 0.55f, 1f, 0.75f);            // Azul para Misión Secundaria
     [Tooltip("Color AMARILLO para el radio de llegada / entrega del pasajero")]
@@ -170,12 +214,14 @@ public class MissionManager : MonoBehaviour
     public MissionCategory categoriaActiva = MissionCategory.EncargoUberAleatorio;
     public List<MissionOrder> ofertasDisponiblesActuales = new List<MissionOrder>();
     public MissionOrder misionAceptadaActual = null;
+    public int indicePuntoIntermedioActual = 0;
     public bool jugadorEnAreaDeAceptacion = false;
     public bool jugadorEnAreaDeEntrega = false;
 
     private float temporizadorRandom = 0f;
     private List<GameObject> marcadoresVisualesOfertas = new List<GameObject>();
     private List<GameObject> pasajerosInstanciadosOfertas = new List<GameObject>();
+    private GameObject marcadorVisualPuntoIntermedio;
     private GameObject marcadorVisualDestinoCentro;
     private GameObject marcadorVisualDestinoArea;
     private bool jugadorEstuvoDentroDelArea = false;
@@ -246,23 +292,50 @@ public class MissionManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Ordena la lista de Misiones Principales estrictamente por nivel (1..5) y número de misión (1..N)
-    /// para garantizar que siempre se ejecuten en orden cronológico sucesivo.
+    /// Ordena la lista de Misiones Principales estrictamente por nivel (1..5) y número de misión (1..N),
+    /// y también ordena los Puntos Intermedios (1..N) dentro de cada misión.
     /// </summary>
     public void OrdenarMisionesPrincipalesCronologicamente()
     {
-        if (misionesPrincipalesSecuencia == null || misionesPrincipalesSecuencia.Count <= 1) return;
+        if (misionesPrincipalesSecuencia == null) return;
 
-        misionesPrincipalesSecuencia.Sort((a, b) =>
+        if (misionesPrincipalesSecuencia.Count > 1)
+        {
+            misionesPrincipalesSecuencia.Sort((a, b) =>
+            {
+                if (a == null && b == null) return 0;
+                if (a == null) return 1;
+                if (b == null) return -1;
+
+                int comparacionNivel = a.nivelDeMision.CompareTo(b.nivelDeMision);
+                if (comparacionNivel != 0) return comparacionNivel;
+
+                return a.numeroDeMision.CompareTo(b.numeroDeMision);
+            });
+        }
+
+        foreach (var mision in misionesPrincipalesSecuencia)
+        {
+            if (mision != null)
+            {
+                OrdenarPuntosIntermediosDeMision(mision);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ordena los puntos intermedios de una misión del 1 al N según su campo 'ordenDelPunto'.
+    /// </summary>
+    private void OrdenarPuntosIntermediosDeMision(MissionOrder mision)
+    {
+        if (mision == null || mision.puntosIntermedios == null || mision.puntosIntermedios.Count <= 1) return;
+
+        mision.puntosIntermedios.Sort((a, b) =>
         {
             if (a == null && b == null) return 0;
             if (a == null) return 1;
             if (b == null) return -1;
-
-            int comparacionNivel = a.nivelDeMision.CompareTo(b.nivelDeMision);
-            if (comparacionNivel != 0) return comparacionNivel;
-
-            return a.numeroDeMision.CompareTo(b.numeroDeMision);
+            return a.ordenDelPunto.CompareTo(b.ordenDelPunto);
         });
     }
 
@@ -281,7 +354,6 @@ public class MissionManager : MonoBehaviour
             return;
         }
 
-        // Leemos la tecla E una sola vez por frame para diferenciar entre Aceptar Misión y Dejar Pasajero
         bool presionoEEnEsteFrame = SePresionoTeclaE();
 
         if (SePresionoEnter())
@@ -327,6 +399,9 @@ public class MissionManager : MonoBehaviour
 
             case MissionState.MisionEnCursoHaciaDestino:
                 jugadorEnAreaDeAceptacion = false;
+                // 1. Verificar si el jugador pasó por alguno de los Puntos Intermedios (1 al N) para activar su diálogo
+                VerificarPasoPorPuntosIntermedios();
+                // 2. Verificar si el jugador llegó al punto amarillo final de destino
                 VerificarLlegadaEnPuntoDeTriunfo(presionoEEnEsteFrame);
                 break;
         }
@@ -433,6 +508,9 @@ public class MissionManager : MonoBehaviour
 
         OcultarTodosLosMarcadores();
 
+        // Preparar y ordenar los Puntos Intermedios (1 al N) de esta misión
+        PrepararPuntosIntermediosAlIniciarMision(misionAceptadaActual);
+
         if (misionAceptadaActual.puntoDeLlegada != null)
         {
             ActivarMarcadorDestinoAmarillo(
@@ -446,7 +524,6 @@ public class MissionManager : MonoBehaviour
 
         Debug.Log($"[MissionManager] Pasajero recogido con tecla E y Misión ACEPTADA ({categoriaActiva}): Nivel {misionAceptadaActual.nivelDeMision} - Misión #{misionAceptadaActual.numeroDeMision} ({misionAceptadaActual.nombreReferencia}). Dirigirse al punto AMARILLO.");
 
-        // Si es una Misión Principal y tiene conversación al aceptar, el GameManager detiene el juego y muestra los turnos
         if (categoriaActiva == MissionCategory.MisionPrincipalHistoria &&
             misionAceptadaActual.mostrarDialogoAlAceptar &&
             misionAceptadaActual.conversacionAlAceptar != null &&
@@ -457,6 +534,119 @@ public class MissionManager : MonoBehaviour
                 misionAceptadaActual.conversacionAlAceptar,
                 misionAceptadaActual.musicaDialogoAlAceptar
             );
+        }
+    }
+
+    // =========================================================================
+    // LOGICA DE PUNTOS INTERMEDIOS (1 AL N) QUE ACTIVAN DIALOGOS AL PASAR
+    // =========================================================================
+
+    /// <summary>
+    /// Reinicia el estado de los puntos intermedios (1 al N) al comenzar la misión y activa el marcador del Punto Intermedio #1.
+    /// </summary>
+    private void PrepararPuntosIntermediosAlIniciarMision(MissionOrder mision)
+    {
+        indicePuntoIntermedioActual = 0;
+
+        if (mision == null || mision.puntosIntermedios == null || mision.puntosIntermedios.Count == 0)
+        {
+            if (marcadorVisualPuntoIntermedio != null) marcadorVisualPuntoIntermedio.SetActive(false);
+            return;
+        }
+
+        OrdenarPuntosIntermediosDeMision(mision);
+
+        foreach (var punto in mision.puntosIntermedios)
+        {
+            if (punto != null) punto.yaFueActivado = false;
+        }
+
+        ActualizarMarcadorVisualDePuntoIntermedioActual();
+    }
+
+    /// <summary>
+    /// Verifica en cada frame si el jugador acaba de pasar por el Punto Intermedio actual (1, 2... N).
+    /// Al entrar a su radio, detiene el juego automáticamente, muestra el diálogo explicativo y pasa al siguiente punto (2..N).
+    /// </summary>
+    private void VerificarPasoPorPuntosIntermedios()
+    {
+        if (misionAceptadaActual == null ||
+            misionAceptadaActual.puntosIntermedios == null ||
+            indicePuntoIntermedioActual >= misionAceptadaActual.puntosIntermedios.Count)
+        {
+            return;
+        }
+
+        PuntoIntermedioMision puntoActual = misionAceptadaActual.puntosIntermedios[indicePuntoIntermedioActual];
+
+        // Si el punto está vacío o ya fue activado, pasamos al siguiente
+        if (puntoActual == null || puntoActual.yaFueActivado || puntoActual.puntoIntermedioTransform == null)
+        {
+            indicePuntoIntermedioActual++;
+            ActualizarMarcadorVisualDePuntoIntermedioActual();
+            return;
+        }
+
+        float distanciaAlPuntoIntermedio = DistanciaPlanaXZ(jugadorTransform.position, puntoActual.puntoIntermedioTransform.position);
+
+        // Si el jugador pasa por dentro del radio del punto intermedio
+        if (distanciaAlPuntoIntermedio <= puntoActual.radioDeActivacion)
+        {
+            puntoActual.yaFueActivado = true;
+            indicePuntoIntermedioActual++;
+
+            // Actualizar el círculo en el suelo para que apunte al siguiente Punto Intermedio (o se apague si era el último)
+            ActualizarMarcadorVisualDePuntoIntermedioActual();
+
+            Debug.Log($"[MissionManager] Punto Intermedio #{puntoActual.ordenDelPunto} ({puntoActual.nombreReferenciaPunto}) alcanzado. Activando diálogo intermedio ({indicePuntoIntermedioActual}/{misionAceptadaActual.puntosIntermedios.Count}).");
+
+            // Llamar al GameManager para detener el juego y mostrar la conversación de este punto intermedio
+            if (puntoActual.conversacionPuntoIntermedio != null &&
+                puntoActual.conversacionPuntoIntermedio.Count > 0 &&
+                GameManager.Instance != null)
+            {
+                GameManager.Instance.DetenerJuegoYMostrarConversacion(
+                    puntoActual.conversacionPuntoIntermedio,
+                    puntoActual.musicaDialogoIntermedio
+                );
+            }
+        }
+    }
+
+    /// <summary>
+    /// Muestra en el suelo el círculo del Punto Intermedio actual (si tiene activa la casilla 'mostrarCirculoEnSuelo').
+    /// </summary>
+    private void ActualizarMarcadorVisualDePuntoIntermedioActual()
+    {
+        if (marcadorVisualPuntoIntermedio == null) return;
+
+        if (misionAceptadaActual == null ||
+            misionAceptadaActual.puntosIntermedios == null ||
+            indicePuntoIntermedioActual >= misionAceptadaActual.puntosIntermedios.Count)
+        {
+            marcadorVisualPuntoIntermedio.SetActive(false);
+            return;
+        }
+
+        PuntoIntermedioMision puntoActual = misionAceptadaActual.puntosIntermedios[indicePuntoIntermedioActual];
+
+        if (puntoActual != null &&
+            puntoActual.puntoIntermedioTransform != null &&
+            puntoActual.mostrarCirculoEnSuelo)
+        {
+            Vector3 pos = puntoActual.puntoIntermedioTransform.position;
+            float radio = puntoActual.radioDeActivacion;
+
+            marcadorVisualPuntoIntermedio.SetActive(true);
+            marcadorVisualPuntoIntermedio.transform.position = new Vector3(pos.x, pos.y + 0.07f, pos.z);
+            marcadorVisualPuntoIntermedio.transform.localScale = new Vector3(radio * 2f, 0.045f, radio * 2f);
+
+            Renderer r = marcadorVisualPuntoIntermedio.GetComponent<Renderer>();
+            if (r != null) r.material.color = colorIndicadorPuntoIntermedio;
+        }
+        else
+        {
+            marcadorVisualPuntoIntermedio.SetActive(false);
         }
     }
 
@@ -588,13 +778,11 @@ public class MissionManager : MonoBehaviour
             Debug.LogWarning($"[MissionManager] MISIÓN FALLIDA / FUERA DE ÁREA ({categoriaActiva}): Nivel {nivel} - Misión #{numMision} ({nombre}). Distancia: {distanciaFinalAlCentro:F2}m.");
         }
 
-        // Otorgar puntos en el GameManager según el radio de llegada (Nivel 1: 10 pts misión + 5 pts radio perfecto)
         if (GameManager.Instance != null)
         {
             GameManager.Instance.CalcularYOtorgarPuntosPorMision(nivel, enRadioPerfecto, dentroDelRadioMaximo);
         }
 
-        // Verificar avance cronológico estricto de las Misiones Principales
         if (categoriaActiva == MissionCategory.MisionPrincipalHistoria)
         {
             if (dentroDelRadioMaximo)
@@ -611,7 +799,6 @@ public class MissionManager : MonoBehaviour
 
                 IniciarEsperaParaNuevaMision();
 
-                // Si tiene conversación al completarse, el GameManager pausa el juego y muestra los turnos
                 if (misionEvaluada.mostrarDialogoAlCompletar &&
                     misionEvaluada.conversacionAlCompletar != null &&
                     misionEvaluada.conversacionAlCompletar.Count > 0 &&
@@ -700,7 +887,6 @@ public class MissionManager : MonoBehaviour
         categoriaActiva = MissionCategory.MisionPrincipalHistoria;
         ofertasDisponiblesActuales.Add(misionPrincipal);
 
-        // Activar el marcador con COLOR VERDE exclusivo para Misiones Principales
         ActivarMarcadorOferta(0, misionPrincipal.puntoDeInicio.position, misionPrincipal.radioDeAceptacion, colorIndicadorMisionPrincipal);
         InstanciarPasajeroEnInicio(misionPrincipal);
 
@@ -729,6 +915,9 @@ public class MissionManager : MonoBehaviour
             marcador.SetActive(false);
             marcadoresVisualesOfertas.Add(marcador);
         }
+
+        marcadorVisualPuntoIntermedio = CrearDiscoVisual("Marcador_Punto_Intermedio_Dialogo", colorIndicadorPuntoIntermedio);
+        marcadorVisualPuntoIntermedio.SetActive(false);
 
         marcadorVisualDestinoCentro = CrearDiscoVisual("Marcador_Llegada_CentroAmarillo", colorIndicadorLlegada);
         marcadorVisualDestinoCentro.SetActive(false);
@@ -786,6 +975,7 @@ public class MissionManager : MonoBehaviour
         {
             if (m != null) m.SetActive(false);
         }
+        if (marcadorVisualPuntoIntermedio != null) marcadorVisualPuntoIntermedio.SetActive(false);
         if (marcadorVisualDestinoCentro != null) marcadorVisualDestinoCentro.SetActive(false);
         if (marcadorVisualDestinoArea != null) marcadorVisualDestinoArea.SetActive(false);
 
@@ -804,10 +994,6 @@ public class MissionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Dibuja en la parte inferior de la pantalla un cuadrado blanco con la letra "E" adentro
-    /// cuando el jugador está dentro del área de aceptación (o entrega) de la misión.
-    /// </summary>
     private void OnGUI()
     {
         if (GameManager.Instance != null && (GameManager.Instance.juegoDetenidoPorDialogo || GameManager.Instance.juegoPausadoPorEscape)) return;
@@ -935,10 +1121,37 @@ public class MissionManager : MonoBehaviour
     {
         if (m == null) return;
 
+        Vector3 ultimoPuntoRuta = Vector3.zero;
+        bool tienePuntoAnterior = false;
+
         if (m.puntoDeInicio != null)
         {
             Gizmos.color = colorInicio;
             Gizmos.DrawWireSphere(m.puntoDeInicio.position, m.radioDeAceptacion);
+            ultimoPuntoRuta = m.puntoDeInicio.position;
+            tienePuntoAnterior = true;
+        }
+
+        // Dibujar los Puntos Intermedios (1 al N) y las líneas que los encadenan en la escena
+        if (m.puntosIntermedios != null && m.puntosIntermedios.Count > 0)
+        {
+            Color colorGizmoIntermedio = new Color(0.15f, 0.95f, 0.65f, 0.9f);
+            foreach (var puntoIntermedio in m.puntosIntermedios)
+            {
+                if (puntoIntermedio == null || puntoIntermedio.puntoIntermedioTransform == null) continue;
+
+                Gizmos.color = colorGizmoIntermedio;
+                Gizmos.DrawWireSphere(puntoIntermedio.puntoIntermedioTransform.position, puntoIntermedio.radioDeActivacion);
+
+                if (tienePuntoAnterior)
+                {
+                    Gizmos.color = new Color(0.15f, 0.95f, 0.65f, 0.55f);
+                    Gizmos.DrawLine(ultimoPuntoRuta, puntoIntermedio.puntoIntermedioTransform.position);
+                }
+
+                ultimoPuntoRuta = puntoIntermedio.puntoIntermedioTransform.position;
+                tienePuntoAnterior = true;
+            }
         }
 
         if (m.puntoDeLlegada != null)
@@ -949,10 +1162,10 @@ public class MissionManager : MonoBehaviour
             Gizmos.color = new Color(1f, 0.5f, 0f, 0.9f);
             Gizmos.DrawWireSphere(m.puntoDeLlegada.position, m.radioMaximoLlegada);
 
-            if (m.puntoDeInicio != null)
+            if (tienePuntoAnterior)
             {
                 Gizmos.color = new Color(colorInicio.r, colorInicio.g, colorInicio.b, 0.45f);
-                Gizmos.DrawLine(m.puntoDeInicio.position, m.puntoDeLlegada.position);
+                Gizmos.DrawLine(ultimoPuntoRuta, m.puntoDeLlegada.position);
             }
         }
     }

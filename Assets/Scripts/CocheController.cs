@@ -133,7 +133,7 @@ public class CrazyCarriageController : MonoBehaviour
         }
     }
 
-    private Vector3 GetWorldForward()
+    public Vector3 GetWorldForward()
     {
         Vector3 dir = transform.TransformDirection(localForwardAxis);
         dir.y = 0f;

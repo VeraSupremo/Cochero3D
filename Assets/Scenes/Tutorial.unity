@@ -348,6 +348,10 @@ MonoBehaviour:
       textoLinea: ....
       iconoEspecifico: {fileID: 0}
       sonidoDeEstaLinea: {fileID: 0}
+    - nombrePersonaje: Inquilino
+      textoLinea: PATRON, EL CHOFER NO TENIA CABEZA!!!!
+      iconoEspecifico: {fileID: 0}
+      sonidoDeEstaLinea: {fileID: 0}
     cambiarDeEscenaAlCompletar: 1
     archivoEscenaSiguiente: {fileID: 102900000, guid: 6b8c570f31db67847a589fdec572a6bb, type: 3}
     nombreEscenaSiguiente: TitleCard

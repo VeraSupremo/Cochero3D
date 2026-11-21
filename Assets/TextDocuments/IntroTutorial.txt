@@ -1,9 +1,7 @@
-Huilquilemu
-*Algún punto del Siglo XIX.
-/
-La lealtad de un cochero se mide en las noches más oscuras.
-/
-La luna llena ilumina los caminos de tierra. Los perros ladran a lo lejos.
-/
-El deber siempre está primero...
-*Un buen cochero jamás rechaza un viaje.
+HUILQUILEMU
+*Siglo XIX
+/La lealtad de un cochero se mide en las noches más oscuras
+/La luna llena ilumina los caminos de tierra. 
+*Los perros ladran a lo lejos
+/El deber siempre está primero,
+*un buen cochero jamás rechaza un viaje...

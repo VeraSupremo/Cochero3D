@@ -11,4 +11,10 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Tutorial.unity
     guid: 0aeffb0a94a22ca4d889cf8ecf21fafc
+  - enabled: 1
+    path: Assets/Scenes/TitleCard.unity
+    guid: 6b8c570f31db67847a589fdec572a6bb
+  - enabled: 1
+    path: Assets/Scenes/PresentDay.unity
+    guid: 86d3ebc46b487e74ead75e57f8576d18
   m_configObjects: {}

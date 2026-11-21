@@ -1,5 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -123,6 +127,21 @@ public class MissionManager : MonoBehaviour
 
         [Tooltip("Agrega con '+' cada turno de conversación en el orden exacto en que hablan los personajes")]
         public List<SistemaDialogos.LineaDeDialogo> conversacionAlCompletar = new List<SistemaDialogos.LineaDeDialogo>();
+
+        [Header("3. Cambio de Escena o Nivel al Terminar esta Misión (Opcional)")]
+        [Tooltip("Si está activo, cuando completes esta misión principal (y termine su diálogo final) te llevará a la escena indicada abajo")]
+        public bool cambiarDeEscenaAlCompletar = false;
+
+#if UNITY_EDITOR
+        [Tooltip("Arrastra aquí directamente la escena desde Assets/Scenes (ej. TitleCard o PresentDay)")]
+        public SceneAsset archivoEscenaSiguiente;
+#endif
+
+        [Tooltip("Nombre de la escena a cargar al terminar esta misión (se llena solo al arrastrar la escena arriba, o puedes escribirlo: ej. PresentDay)")]
+        public string nombreEscenaSiguiente = "";
+
+        [Tooltip("Si pones un número mayor a 0 (ej. 2), cambia el nivel actual a ese número al terminar la misión. Déjalo en 0 para no forzar cambio de nivel.")]
+        public int cambiarANumeroDeNivel = 0;
 
         [Header("Estado Cronológico (Solo Lectura)")]
         [Tooltip("Se marca automáticamente cuando el jugador completa esta misión en su totalidad")]
@@ -809,12 +828,13 @@ public class MissionManager : MonoBehaviour
                         misionEvaluada.musicaDialogoAlCompletar,
                         () =>
                         {
-                            if (priorizarMisionesPrincipalesEnOrden && HayMisionesPrincipalesPendientes())
-                            {
-                                LanzarSiguienteMisionPrincipal();
-                            }
+                            EjecutarCambioDeEscenaONivelPostMision(misionEvaluada);
                         }
                     );
+                }
+                else
+                {
+                    EjecutarCambioDeEscenaONivelPostMision(misionEvaluada);
                 }
                 return;
             }
@@ -840,6 +860,82 @@ public class MissionManager : MonoBehaviour
         temporizadorRandom = 0f;
         estadoActual = MissionState.EsperandoNuevaOrden;
     }
+
+    // =========================================================================
+    // CAMBIO DE ESCENA O NIVEL AL TERMINAR UNA MISION PRINCIPAL
+    // =========================================================================
+
+    /// <summary>
+    /// Se ejecuta justo después de terminar una Misión Principal (y su diálogo final).
+    /// Si la misión tiene configurado un cambio de nivel o un cambio de escena, lo aplica;
+    /// de lo contrario, lanza la siguiente misión principal en la escena actual.
+    /// </summary>
+    private void EjecutarCambioDeEscenaONivelPostMision(MissionOrder misionCompletada)
+    {
+        if (misionCompletada == null) return;
+
+        // 1. ¿La misión pide cambiar a un número de Nivel específico?
+        if (misionCompletada.cambiarANumeroDeNivel > 0)
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.CambiarDeNivel(misionCompletada.cambiarANumeroDeNivel);
+            }
+            else
+            {
+                CambiarNivelActual(misionCompletada.cambiarANumeroDeNivel);
+            }
+        }
+
+        // 2. ¿La misión pide ir a otra escena de Unity (ej. de Tutorial a TitleCard o PresentDay)?
+        if (misionCompletada.cambiarDeEscenaAlCompletar && !string.IsNullOrEmpty(misionCompletada.nombreEscenaSiguiente))
+        {
+            CargarEscenaDestino(misionCompletada.nombreEscenaSiguiente);
+            return;
+        }
+
+        // 3. Si nos quedamos en la misma escena y hay más misiones principales en la lista, lanzamos la siguiente
+        if (priorizarMisionesPrincipalesEnOrden && HayMisionesPrincipalesPendientes())
+        {
+            LanzarSiguienteMisionPrincipal();
+        }
+    }
+
+    /// <summary>
+    /// Carga la escena indicada asegurando que el tiempo del juego no quede pausado.
+    /// </summary>
+    public void CargarEscenaDestino(string nombreEscena)
+    {
+        if (string.IsNullOrEmpty(nombreEscena)) return;
+
+        Time.timeScale = 1f;
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.juegoDetenidoPorDialogo = false;
+            GameManager.Instance.juegoPausadoPorEscape = false;
+        }
+
+        Debug.Log($"[MissionManager] Cambiando a la escena: '{nombreEscena}'...");
+        SceneManager.LoadScene(nombreEscena);
+    }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// Sincroniza automáticamente el nombre de la escena cuando arrastras el archivo de escena en el Inspector.
+    /// </summary>
+    private void OnValidate()
+    {
+        if (misionesPrincipalesSecuencia == null) return;
+
+        foreach (var mision in misionesPrincipalesSecuencia)
+        {
+            if (mision != null && mision.archivoEscenaSiguiente != null)
+            {
+                mision.nombreEscenaSiguiente = mision.archivoEscenaSiguiente.name;
+            }
+        }
+    }
+#endif
 
     // =========================================================================
     // APARTADO EXCLUSIVO: MISIONES PRINCIPALES (ORDEN CRONOLOGICO 1 AL N)

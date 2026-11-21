@@ -230,7 +230,7 @@ MonoBehaviour:
   - nombreReferencia: Tutorial
     nivelDeMision: 1
     numeroDeMision: 1
-    prefabPasajeroEspecifico: {fileID: 3726157839987882284, guid: b781561dfa72bfd4095186102641064e, type: 3}
+    prefabPasajeroEspecifico: {fileID: 919132149155446097, guid: 1de1bd91db236b64f93ea3165f7acca2, type: 3}
     puntoDeInicio: {fileID: 2127807713}
     puntoDeLlegada: {fileID: 2141832063}
     puntosIntermedios:
@@ -348,6 +348,10 @@ MonoBehaviour:
       textoLinea: ....
       iconoEspecifico: {fileID: 0}
       sonidoDeEstaLinea: {fileID: 0}
+    cambiarDeEscenaAlCompletar: 1
+    archivoEscenaSiguiente: {fileID: 102900000, guid: 6b8c570f31db67847a589fdec572a6bb, type: 3}
+    nombreEscenaSiguiente: TitleCard
+    cambiarANumeroDeNivel: 0
     misionCompletada: 0
   indiceMisionPrincipalActual: 1
   reiniciarSecuenciaPrincipalAlIniciar: 1
@@ -381,6 +385,10 @@ MonoBehaviour:
     mostrarDialogoAlCompletar: 0
     musicaDialogoAlCompletar: {fileID: 0}
     conversacionAlCompletar: []
+    cambiarDeEscenaAlCompletar: 0
+    archivoEscenaSiguiente: {fileID: 0}
+    nombreEscenaSiguiente: 
+    cambiarANumeroDeNivel: 0
     misionCompletada: 0
   indicePuntoIntermedioActual: 0
   jugadorEnAreaDeAceptacion: 0
